@@ -19,6 +19,6 @@ export function playOut(s: GameState, maxSteps = 20000): { state: GameState; ste
   return { state: s, steps }
 }
 
-export function simulate(n: number, seed: number) {
-  return playOut(startGame(makeConfig(n, seed)), 6000)
+export function simulate(n: number, seed: number, expansions: string[] = []) {
+  return playOut(startGame(makeConfig(n, seed, expansions)), 8000)
 }

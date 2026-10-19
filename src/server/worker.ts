@@ -1,5 +1,5 @@
 import { DurableObject } from 'cloudflare:workers'
-import { AI_NAMES, EXPANSIONS, MAX_PLAYERS, MIN_PLAYERS } from '../engine/data'
+import { AI_NAMES, EXPANSIONS, MAX_PLAYERS, maxPlayersFor, MIN_PLAYERS } from '../engine/data'
 import type { Action, GameConfig, GameState } from '../engine/types'
 import { viewFor } from '../engine/view'
 import {
@@ -332,9 +332,11 @@ export class Room extends DurableObject<Env> {
   private updateSettings(p: Partial<RoomSettings>) {
     const d = this.d!
     const next = { ...d.settings, ...p }
-    next.count = Math.max(MIN_PLAYERS, Math.min(MAX_PLAYERS, Math.max(Number(next.count) || MIN_PLAYERS, d.members.length)))
     const ok = new Set(EXPANSIONS.filter((e) => e.ready).map((e) => e.id))
     next.expansions = Array.isArray(next.expansions) ? next.expansions.filter((x) => ok.has(x)) : []
+    // 道奇城才能 8 人；人已經太多就自動加上道奇城
+    if (d.members.length > maxPlayersFor(next.expansions)) next.expansions = [...next.expansions, 'dodge_city']
+    next.count = Math.max(MIN_PLAYERS, Math.min(maxPlayersFor(next.expansions), Math.max(Number(next.count) || MIN_PLAYERS, d.members.length)))
     d.settings = next
     this.broadcastRoom()
   }

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AI_NAMES, EXPANSIONS, MAX_PLAYERS, MIN_PLAYERS, ROLE_NAME } from '../../engine/data'
+import { AI_NAMES, EXPANSIONS, maxPlayersFor, MIN_PLAYERS, ROLE_NAME } from '../../engine/data'
 import type { GameConfig } from '../../engine/types'
 import { DocsButtons } from './Docs'
 import { normaliseCode } from '../../shared/protocol'
@@ -143,7 +143,7 @@ export function Lobby({
         <div className="field">
           <span>遊戲人數（含你）</span>
           <div className="segmented" role="radiogroup" aria-label="遊戲人數">
-            {Array.from({ length: MAX_PLAYERS - MIN_PLAYERS + 1 }, (_, i) => MIN_PLAYERS + i).map((n) => (
+            {Array.from({ length: maxPlayersFor(expansions) - MIN_PLAYERS + 1 }, (_, i) => MIN_PLAYERS + i).map((n) => (
               <button key={n} type="button" role="radio" aria-checked={n === count} className={n === count ? 'on' : ''} onClick={() => setCount(n)}>
                 {n}
               </button>
@@ -151,7 +151,13 @@ export function Lobby({
           </div>
         </div>
 
-        <ExpansionPicker value={expansions} onChange={setExpansions} />
+        <ExpansionPicker
+          value={expansions}
+          onChange={(x) => {
+            setExpansions(x)
+            if (count > maxPlayersFor(x)) setCount(maxPlayersFor(x))
+          }}
+        />
 
         <button type="button" className="primary" onClick={startLocal}>
           開始單機遊戲
@@ -186,7 +192,7 @@ export function Lobby({
         </section>
       )}
 
-      <footer className="lobby-foot">基本版 80 張牌、16 位角色全部實裝。擴充陸續開放中。</footer>
+      <footer className="lobby-foot">基本版、道奇城（8 人局）、正午、一把卡牌已實裝，其他擴充陸續開放。</footer>
     </main>
   )
 }

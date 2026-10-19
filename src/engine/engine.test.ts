@@ -44,6 +44,16 @@ function clearHands(s: GameState) {
 }
 const total = (s: GameState) => s.deck.length + s.discard.length + s.store.length + s.players.reduce((a, p) => a + p.hand.length + p.table.length, 0)
 
+function setupX(n: number, exps: string[], chars: Record<number, string> = {}, seed = 3): GameState {
+  let s = structuredClone(startGame(makeConfig(n, seed, exps)))
+  for (const p of s.players) {
+    const want = chars[p.seat]
+    if (want) p.charOptions = [want, p.charOptions[1] === want ? p.charOptions[0] : p.charOptions[1]]
+  }
+  for (const d of getDecisions(s)) if (d.type === 'choose_character') s = applyAction(s, d.player, { type: 'choose_character', character: d.options[0] })
+  return s
+}
+
 describe('規則', () => {
   it('開局：警長先手、多 1 點生命、手牌等於生命', () => {
     const s = setup(5)
@@ -137,7 +147,102 @@ describe('規則', () => {
   })
 })
 
+describe('道奇城', () => {
+  it('120 張牌、8 人局可以開', () => {
+    expect(buildCards(['dodge_city'])).toHaveLength(120)
+    const s = setupX(8, ['dodge_city'])
+    expect(s.players).toHaveLength(8)
+    expect(total(s)).toBe(120)
+  })
+
+  it('綠牌放上場的那回合不能用', () => {
+    let s = setupX(4, ['dodge_city'])
+    const a = s.turn.active
+    clearHands(s)
+    give(s, a, ['pony'])
+    s = applyAction(s, a, { type: 'play', card: s.players[a].hand[0] })
+    expect(s.players[a].table.length).toBe(1)
+    expect(legalPlays(s, a).some((l) => l.source === 'table')).toBe(false)
+  })
+
+  it('需要代價的牌要另外棄一張', () => {
+    let s = setupX(4, ['dodge_city'])
+    const a = s.turn.active
+    clearHands(s)
+    s.players[a].hp = 1
+    give(s, a, ['whisky', 'missed'])
+    const [w, m] = s.players[a].hand
+    expect(() => applyAction(s, a, { type: 'play', card: w })).toThrow()
+    s = applyAction(s, a, { type: 'play', card: w, extra: [m] })
+    expect(s.players[a].hp).toBe(3)
+    expect(s.players[a].hand).toHaveLength(0)
+  })
+
+  it('十加侖帽可以在場上當射偏了', () => {
+    let s = setupX(4, ['dodge_city'])
+    s = structuredClone(s)
+    const a = s.turn.active
+    const t = s.players.map((p) => p.seat).find((q) => q !== a && distance(s, a, q) <= 1)!
+    clearHands(s)
+    give(s, a, ['bang'])
+    const hat = s.cards.find((c) => c.key === 'hat')!.id
+    s.deck = s.deck.filter((x) => x !== hat)
+    s.discard = s.discard.filter((x) => x !== hat)
+    s.players[t].table.push(hat)
+    const hp = s.players[t].hp
+    s = applyAction(s, a, { type: 'play', card: s.players[a].hand[0], target: t })
+    const d = getDecisions(s)[0]
+    expect(d.type === 'ask' && d.ask.cards.includes(hat)).toBe(true)
+    s = applyAction(s, t, { type: 'answer', cards: [hat] })
+    expect(s.players[t].hp).toBe(hp)
+    expect(s.players[t].table).not.toContain(hat)
+  })
+})
+
+describe('事件', () => {
+  it('佈道：不能打砰！；法官：不能裝備', () => {
+    let s = setupX(4, ['high_noon', 'fistful'])
+    s = structuredClone(s)
+    const a = s.turn.active
+    clearHands(s)
+    give(s, a, ['bang', 'barrel'])
+    s.events!.current = 'sermon'
+    expect(legalPlays(s, a).some((l) => l.as === 'bang')).toBe(false)
+    s.events!.current = 'judge'
+    expect(legalPlays(s, a).some((l) => l.as === 'barrel')).toBe(false)
+  })
+
+  it('套索：場上的牌沒有效果', () => {
+    let s = setupX(4, ['fistful'])
+    s = structuredClone(s)
+    const a = s.turn.active
+    const scope = s.cards.find((c) => c.key === 'winchester')!.id
+    s.deck = s.deck.filter((x) => x !== scope)
+    s.players[a].table.push(scope)
+    const t = s.players.map((p) => p.seat).find((q) => q !== a)!
+    expect(viewFor(s, a).myRange).toBe(5)
+    s.events!.current = 'lasso'
+    expect(viewFor(s, a).myRange).toBe(1)
+    void t
+  })
+
+  it('事件牌在警長第二個回合開始翻開，最後一張是結局牌', () => {
+    const s = setupX(4, ['high_noon'])
+    expect(s.events!.current).toBeNull()
+    expect(s.events!.deck[s.events!.deck.length - 1]).toBe('highnoon')
+  })
+})
+
 describe('AI 自動對戰', () => {
+  it('全部擴充一起玩也能打完，牌數守恆', () => {
+    for (let seed = 1; seed <= 15; seed++) {
+      const n = 4 + (seed % 5)
+      const { state } = playOut(startGame(makeConfig(n, seed * 17, ['dodge_city', 'high_noon', 'fistful'])), 10000)
+      expect(state.result, `seed ${seed}`).not.toBeNull()
+      expect(total(state)).toBe(120)
+    }
+  })
+
   it('4–7 人都能打完，牌數守恆', () => {
     for (let n = 4; n <= 7; n++) {
       for (let seed = 1; seed <= 12; seed++) {

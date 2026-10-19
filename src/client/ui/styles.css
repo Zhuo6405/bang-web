@@ -2478,3 +2478,63 @@ button:disabled {
   writing-mode: horizontal-tb;
   white-space: nowrap;
 }
+
+/* 事件 */
+.event-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  max-width: 420px;
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: #d9c08a;
+  color: #2a1a10;
+  border: 3px solid #5a3518;
+  font-size: 14px;
+}
+.event-banner b {
+  font-family: var(--serif);
+  font-size: 18px;
+  color: #7a1e12;
+}
+.event-banner small {
+  margin-left: auto;
+  color: #5a3518;
+}
+.event-tag {
+  font-weight: 700;
+  font-size: 12px;
+  padding: 0 6px;
+  border-radius: 3px;
+  background: #5a3518;
+  color: #f4e4bf;
+}
+.log li.is-event {
+  color: #e0b85a;
+  font-weight: 700;
+}
+.cuffs {
+  margin-left: 10px;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: #5a3a22;
+  color: #ffe9c0;
+}
+.gear.is-fresh {
+  opacity: 0.55;
+  outline: 1px dashed rgba(255, 255, 255, 0.5);
+}
+.gear-btn {
+  background: var(--card-green);
+  color: #fff;
+  border-color: #5c9150;
+}
+.gear-btn.on {
+  outline: 3px solid var(--brass);
+}
+.card.is-forced {
+  outline: 3px solid #e0b85a;
+  box-shadow: 0 0 18px rgba(224, 184, 90, 0.8);
+}

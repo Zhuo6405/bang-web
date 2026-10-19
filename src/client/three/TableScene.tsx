@@ -2,10 +2,10 @@ import { Html, OrbitControls } from '@react-three/drei'
 import { Canvas, useFrame, useThree, type ThreeElements } from '@react-three/fiber'
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
-import { CARD_DEFS, CHAR_BY_ID, ROLE_NAME } from '../../engine/data'
+import { CARD_DEFS, CHAR_BY_ID, EVENT_BY_ID, ROLE_NAME } from '../../engine/data'
 import type { Card, Fx } from '../../engine/types'
 import type { GameView, PublicPlayer } from '../../engine/view'
-import { cardBackTexture, cardTexture, clearTextures, wordTexture } from './textures'
+import { cardBackTexture, cardTexture, clearTextures, eventTexture, wordTexture } from './textures'
 
 // 3D 酒館牌桌：圍坐的牛仔、桌上的裝備、拔槍射擊
 
@@ -369,6 +369,12 @@ function Centre({ v }: { v: GameView }) {
         </mesh>
       </group>
       {v.discardTop && <CardMesh card={v.discardTop} w={0.5} position={[0.45, TABLE_Y + 0.02, -0.3]} rotation={[-Math.PI / 2, 0, 0.08]} />}
+      {v.event && EVENT_BY_ID[v.event] && (
+        <mesh position={[0, TABLE_Y + 0.025, -1.25]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+          <planeGeometry args={[0.9, 1.25]} />
+          <meshStandardMaterial map={eventTexture(EVENT_BY_ID[v.event].name, EVENT_BY_ID[v.event].text)} roughness={0.85} />
+        </mesh>
+      )}
       {v.store.map((c, i) => (
         <CardMesh key={c.id} card={c} w={0.45} position={[(i - (v.store.length - 1) / 2) * 0.52, TABLE_Y + 0.03, 0.6]} rotation={[-Math.PI / 2, 0, 0]} />
       ))}
@@ -686,6 +692,7 @@ function Seat({
   const winner = !!v.result?.winners.includes(p.seat)
   const marks: { text: string; cls: string }[] = []
   if (dead) marks.push({ text: '死亡', cls: 'm-dead' })
+  if (p.ghost) marks.push({ text: '幽靈', cls: 'm-ai' })
   if (v.active === p.seat && p.alive) marks.push({ text: '回合中', cls: 'm-turn' })
   if (p.table.some((c) => c.key === 'jail')) marks.push({ text: '監獄', cls: 'm-lock' })
   if (p.table.some((c) => c.key === 'dynamite')) marks.push({ text: '炸藥', cls: 'm-divert' })
@@ -694,7 +701,7 @@ function Seat({
   return (
     <group>
       <group position={pos} rotation-y={theta + Math.PI}>
-        {!(me && mode === 'first') && <Figure p={p} n={v.players.length} me={v.me} theta={theta} opacity={dead ? 0.5 : 1} dead={dead} acting={acting} reduced={reduced} />}
+        {!(me && mode === 'first') && <Figure p={p} n={v.players.length} me={v.me} theta={theta} opacity={dead ? 0.5 : p.ghost ? 0.4 : 1} dead={dead} acting={acting} reduced={reduced} />}
       </group>
       {(acting || winner) && (
         <mesh ref={ring} position={polar(theta, TABLE_R - 0.18, TABLE_Y + 0.01)} rotation={[-Math.PI / 2, 0, 0]}>
@@ -739,7 +746,7 @@ export function PlateBody({ p, v, me, ch, marks }: { p: PublicPlayer; v: GameVie
       {p.table.length > 0 && (
         <div className="plate-gear">
           {p.table.map((c) => (
-            <span key={c.id} className={`gear g-${CARD_DEFS[c.key].colour}`} title={CARD_DEFS[c.key].desc}>
+            <span key={c.id} className={`gear g-${CARD_DEFS[c.key].colour} ${v.fresh.includes(c.id) ? 'is-fresh' : ''}`} title={CARD_DEFS[c.key].desc}>
               {CARD_DEFS[c.key].name}
             </span>
           ))}

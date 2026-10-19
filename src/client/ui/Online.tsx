@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { MAX_PLAYERS, MIN_PLAYERS } from '../../engine/data'
+import { maxPlayersFor, MIN_PLAYERS } from '../../engine/data'
 import type { RoomSession } from '../net/session'
 import { VoiceMesh } from '../net/voice'
 import { useStore, type GameController, type Social } from './controller'
@@ -164,7 +164,7 @@ function RoomView({ session, voice, onLeave }: { session: RoomSession; voice: Vo
               <div className="field">
                 <span>遊戲人數（人不夠會由電腦補位）</span>
                 <div className="segmented" role="radiogroup" aria-label="遊戲人數">
-                  {Array.from({ length: MAX_PLAYERS - MIN_PLAYERS + 1 }, (_, i) => MIN_PLAYERS + i).map((n) => (
+                  {Array.from({ length: maxPlayersFor(s.expansions) - MIN_PLAYERS + 1 }, (_, i) => MIN_PLAYERS + i).map((n) => (
                     <button key={n} type="button" role="radio" aria-checked={n === s.count} className={n === s.count ? 'on' : ''} disabled={n < humans} onClick={() => session.updateSettings({ count: n })}>
                       {n}
                     </button>

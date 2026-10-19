@@ -57,7 +57,7 @@ export function cardTexture(card: Card) {
     // 底部：類型
     g.fillStyle = BORDER[def.colour]
     g.font = `700 26px ${SERIF}`
-    g.fillText(def.colour === 'blue' ? (def.range ? `武器．射程 ${def.range}` : '裝備') : '立即使用', 128, 318)
+    g.fillText(def.colour === 'blue' ? (def.range ? `武器．射程 ${def.range}` : '裝備') : def.colour === 'green' ? '綠牌（下回合起可用）' : def.cost ? '另外棄 1 張' : '立即使用', 128, 318)
   })
 }
 
@@ -91,5 +91,38 @@ export function wordTexture(text: string, colour: string) {
     g.strokeText(text, 256, 84)
     g.fillStyle = colour
     g.fillText(text, 256, 84)
+  })
+}
+
+/** 事件牌：通緝令風格 */
+export function eventTexture(name: string, text: string) {
+  return make(`event-${name}`, 360, 500, (g) => {
+    g.fillStyle = '#d9c08a'
+    g.fillRect(0, 0, 360, 500)
+    g.strokeStyle = '#5a3518'
+    g.lineWidth = 10
+    g.strokeRect(14, 14, 332, 472)
+    g.fillStyle = '#5a3518'
+    g.textAlign = 'center'
+    g.textBaseline = 'middle'
+    g.font = `900 34px ${SERIF}`
+    g.fillText('事 件', 180, 62)
+    g.font = `900 ${name.length <= 2 ? 92 : name.length <= 3 ? 76 : 60}px ${SERIF}`
+    g.fillStyle = '#7a1e12'
+    g.fillText(name, 180, 160)
+    g.fillStyle = '#2a1a10'
+    g.font = `600 26px ${SERIF}`
+    // 自動換行
+    const lines: string[] = []
+    let line = ''
+    for (const ch of text) {
+      if (g.measureText(line + ch).width > 290) {
+        lines.push(line)
+        line = ''
+      }
+      line += ch
+    }
+    if (line) lines.push(line)
+    lines.slice(0, 8).forEach((l, i) => g.fillText(l, 180, 250 + i * 34))
   })
 }

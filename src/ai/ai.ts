@@ -1,11 +1,12 @@
 import { CARD_DEFS, CHAR_BY_ID, ROLE_SETUP } from '../engine/data'
-import type { Action, AskView, Card, CardKey, LegalPlay, Role } from '../engine/types'
+import type { Action, AskView, Card, CardKey, LegalPlay, Role, Suit } from '../engine/types'
 import type { GameView, PublicPlayer } from '../engine/view'
 
 // 簡單的啟發式 AI：只看自己的視角（不作弊）
 
-const BASE_VALUE: Record<CardKey, number> = {
+const BASE_VALUE: Partial<Record<CardKey, number>> = {
   missed: 5,
+  dodge: 5.2,
   beer: 4.5,
   bang: 4,
   wellsfargo: 5,
@@ -19,7 +20,9 @@ const BASE_VALUE: Record<CardKey, number> = {
   saloon: 2,
   barrel: 5,
   mustang: 4,
+  hideout: 4,
   scope: 3,
+  binocular: 3,
   jail: 3,
   dynamite: 1,
   volcanic: 2.5,
@@ -27,11 +30,32 @@ const BASE_VALUE: Record<CardKey, number> = {
   remington: 2.5,
   carabine: 3,
   winchester: 3.5,
+  punch: 3,
+  ragtime: 3.5,
+  brawl: 3,
+  springfield: 3.5,
+  tequila: 3,
+  whisky: 3.5,
+  bible: 4.5,
+  hat: 4,
+  ironplate: 4,
+  sombrero: 4,
+  knife: 3,
+  derringer: 3.5,
+  canteen: 3.5,
+  cancan: 3.5,
+  conestoga: 3.5,
+  pepperbox: 3.5,
+  buffalo: 3.5,
+  howitzer: 4,
+  pony: 4.5,
 }
 
 const CHAR_PREF: Record<string, number> = {
   willy: 9, slab: 8, jourdonnais: 8, bart: 7, kit: 7, lucky: 7, calamity: 7, blackjack: 6, sid: 6,
   paul: 5, rose: 6, jesse: 6, pedro: 5, suzy: 5, vulture: 6, gringo: 5,
+  pixie: 8, elena: 8, bill: 6, tequilajoe: 6, greg: 6, herb: 6, molly: 7, apache: 6, sean: 5, belle: 6,
+  vera: 6, chuck: 7, pat: 6, jose: 6, doc: 7,
 }
 
 const rnd = Math.random
@@ -39,8 +63,9 @@ const rnd = Math.random
 function value(v: GameView, c: Card) {
   let x = BASE_VALUE[c.key] ?? 2
   const me = v.players[v.me]
-  if (c.key === 'beer' && me.hp >= me.maxHp) x = 2.5
-  if (CARD_DEFS[c.key].colour === 'blue' && me.table.some((t) => t.key === c.key)) x = 0.5
+  if ((c.key === 'beer' || c.key === 'whisky') && me.hp >= me.maxHp) x = 2.5
+  const col = CARD_DEFS[c.key].colour
+  if (col !== 'brown' && me.table.some((t) => t.key === c.key)) x = 0.5
   if (CARD_DEFS[c.key].range && (CARD_DEFS[c.key].range ?? 0) <= v.myRange) x = 1
   return x + rnd() * 0.3
 }
@@ -68,7 +93,6 @@ function hostility(v: GameView, q: PublicPlayer): number {
     case 'sheriff':
     case 'deputy': {
       if (q.role === 'sheriff') return -10
-      // 歹徒都死光了：剩下的未知者只可能是副警長或叛徒
       if (outlawsLeft === 0) {
         const unknown = living.filter((p) => p.seat !== v.me && p.role !== 'sheriff')
         const deputiesLeft = remaining(v, 'deputy') - (role === 'deputy' ? 1 : 0)
@@ -83,7 +107,6 @@ function hostility(v: GameView, q: PublicPlayer): number {
       return q.rep * 1.2 + 0.1 + urgency * 0.4
     case 'renegade': {
       if (q.seat === sh) return living.length <= 2 ? 10 : q.hp <= 2 ? -5 : -1 + urgency * 0.2
-      // 歹徒死光後，所有人都是障礙（先清副警長，最後單挑警長）
       if (outlawsLeft === 0) return 4
       return -q.rep + 0.2 + urgency * 0.3
     }
@@ -96,6 +119,7 @@ function enemies(v: GameView, among: number[]) {
     .filter((p) => hostility(v, p) > 0)
     .sort((a, b) => hostility(v, b) - hostility(v, a) || a.hp - b.hp)
 }
+const mostHostile = (v: GameView, among: number[]) => [...among].sort((a, b) => hostility(v, v.players[b]) - hostility(v, v.players[a]))[0]
 
 export function decide(v: GameView): Action {
   const d = v.decision
@@ -108,32 +132,44 @@ export function decide(v: GameView): Action {
   return playTurn(v)
 }
 
+function cardById(v: GameView, id: number): Card | undefined {
+  return v.hand.find((c) => c.id === id) ?? v.store.find((c) => c.id === id) ?? v.players.flatMap((p) => p.table).find((c) => c.id === id)
+}
+
 function answer(v: GameView, a: AskView): Action {
   const me = v.players[v.me]
-  const hand = new Map(v.hand.map((c) => [c.id, c]))
   const cheapest = (ids: number[], n: number) =>
-    [...ids].sort((x, y) => value(v, hand.get(x) ?? v.store.find((c) => c.id === x)!) - value(v, hand.get(y) ?? v.store.find((c) => c.id === y)!)).slice(0, n)
+    [...ids].sort((x, y) => value(v, cardById(v, x) ?? v.hand[0]) - value(v, cardById(v, y) ?? v.hand[0])).slice(0, n)
+  const tableIds = new Set(a.table.map((c) => c.id))
   switch (a.kind) {
-    case 'respond':
+    case 'respond': {
       if (a.options.some((o) => o.id === 'barrel')) return { type: 'answer', opt: 'barrel' }
+      const fromTable = a.cards.filter((id) => tableIds.has(id))
+      if (fromTable.length) return { type: 'answer', cards: [fromTable[0]] }
       if (a.cards.length) return { type: 'answer', cards: cheapest(a.cards, 1) }
       return { type: 'answer', opt: 'take' }
+    }
     case 'indians':
     case 'duel':
+    case 'roulette':
       if (a.cards.length) return { type: 'answer', cards: cheapest(a.cards, 1) }
       return { type: 'answer', opt: 'take' }
+    case 'ricochet': {
+      if (a.cards.length && rnd() < 0.7) return { type: 'answer', cards: cheapest(a.cards, 1) }
+      return { type: 'answer', opt: 'take' }
+    }
     case 'store': {
       const best = [...v.store].filter((c) => a.cards.includes(c.id)).sort((x, y) => value(v, y) - value(v, x))[0]
       return { type: 'answer', cards: [best.id] }
     }
     case 'dying':
       if (a.cards.length) return { type: 'answer', cards: [a.cards[0]] }
-      if (a.options.some((o) => o.id === 'sid')) return { type: 'ability', ability: 'sid', cards: cheapest(v.hand.map((c) => c.id), 2) }
+      if (v.abilities.some((x) => x.id === 'sid')) return { type: 'ability', ability: 'sid', cards: cheapest(v.hand.map((c) => c.id), 2) }
       return { type: 'answer', opt: 'die' }
     case 'discard':
       return { type: 'answer', opt: 'ok', cards: cheapest(a.cards, a.min) }
     case 'kit': {
-      const best = [...a.shown].sort((x, y) => value(v, y) - value(v, x)).slice(0, 2)
+      const best = [...a.shown].sort((x, y) => value(v, y) - value(v, x)).slice(0, a.min)
       return { type: 'answer', opt: 'ok', cards: best.map((c) => c.id) }
     }
     case 'jesse': {
@@ -142,94 +178,193 @@ function answer(v: GameView, a: AskView): Action {
     }
     case 'pedro':
       return { type: 'answer', opt: v.discardTop && value(v, v.discardTop) >= 3.5 ? 'discard' : 'deck' }
+    case 'pat': {
+      const owner = (c: Card) => v.players.find((p) => p.table.some((x) => x.id === c.id))!
+      const best = a.shown.filter((c) => hostility(v, owner(c)) > 0 && value(v, c) >= 4).sort((x, y) => value(v, y) - value(v, x))[0]
+      return best ? { type: 'answer', cards: [best.id] } : { type: 'answer', opt: 'deck' }
+    }
+    case 'vera': {
+      const t = [...a.targets].sort((x, y) => (CHAR_PREF[v.players[y].character ?? ''] ?? 5) - (CHAR_PREF[v.players[x].character ?? ''] ?? 5))[0]
+      return t != null ? { type: 'answer', target: t } : { type: 'answer', opt: 'skip' }
+    }
+    case 'brawl': {
+      const owner = v.players.find((p) => a.shown.length && p.table.some((c) => c.id === a.shown[0].id))
+      if (owner && hostility(v, owner) < 0) {
+        const bad = a.shown.find((c) => c.key === 'jail' || c.key === 'dynamite')
+        if (bad) return { type: 'answer', cards: [bad.id] }
+      }
+      if (owner && hostility(v, owner) > 0) {
+        const good = [...a.shown].filter((c) => c.key !== 'jail' && c.key !== 'dynamite').sort((x, y) => value(v, y) - value(v, x))[0]
+        if (good && value(v, good) >= 3.5) return { type: 'answer', cards: [good.id] }
+      }
+      if (a.options.some((o) => o.id === 'hand')) return { type: 'answer', opt: 'hand' }
+      return { type: 'answer', cards: [a.cards[0]] }
+    }
+    case 'daltons':
+      return { type: 'answer', cards: cheapest(a.cards, 1) }
+    case 'handcuffs': {
+      const score: Record<Suit, number> = { H: 0, D: 0, C: 0, S: 0 }
+      for (const c of v.hand) score[c.suit] += value(v, c)
+      const best = (Object.keys(score) as Suit[]).sort((x, y) => score[y] - score[x])[0]
+      return { type: 'answer', opt: best }
+    }
+    case 'newidentity':
+      return { type: 'answer', opt: me.hp <= 1 ? 'swap' : 'keep' }
+    case 'blood': {
+      const sh = sheriffSeat(v)
+      const friend = a.targets.find((q) => hostility(v, v.players[q]) < 0 && v.players[q].hp <= 2)
+      if (me.hp >= 3 && friend != null && (friend === sh || rnd() < 0.5)) return { type: 'answer', target: friend }
+      return { type: 'answer', opt: 'skip' }
+    }
+    case 'liquor':
+      return { type: 'answer', opt: me.hp <= 2 && me.hp < me.maxHp ? 'heal' : 'draw' }
+    case 'peyote':
+      return { type: 'answer', opt: rnd() < 0.5 ? 'red' : 'black' }
+    case 'ranch': {
+      const junk = v.hand.filter((c) => value(v, c) < 2.6).map((c) => c.id)
+      return { type: 'answer', opt: 'ok', cards: junk }
+    }
   }
-  void me
-  return { type: 'answer', opt: 'take' }
 }
 
-const PRIORITY: CardKey[] = ['wellsfargo', 'stagecoach', 'barrel', 'mustang', 'scope', 'winchester', 'carabine', 'remington', 'schofield', 'volcanic', 'beer', 'store']
+const PRIORITY: CardKey[] = [
+  'wellsfargo', 'stagecoach', 'pony',
+  'barrel', 'mustang', 'hideout', 'scope', 'binocular',
+  'winchester', 'carabine', 'remington', 'schofield', 'volcanic',
+  'bible', 'hat', 'ironplate', 'sombrero', 'knife', 'derringer', 'canteen', 'cancan', 'conestoga', 'pepperbox', 'buffalo', 'howitzer',
+  'beer', 'store',
+]
 
 function playTurn(v: GameView): Action {
   const me = v.players[v.me]
   const legal = v.legal
-  const byKey = (k: CardKey) => legal.filter((l) => l.as === k)
-  const cardOf = (l: LegalPlay) => v.hand.find((c) => c.id === l.card)!
+  const byAs = (k: string) => legal.filter((l) => l.as === k)
+  const cardOf = (l: LegalPlay) => (l.source === 'table' ? me.table : v.hand).find((c) => c.id === l.card)!
   const others = v.players.filter((p) => p.alive && p.seat !== v.me)
   const foes = enemies(v, others.map((p) => p.seat))
   const friends = others.filter((p) => hostility(v, p) < 0)
+  const hurt = me.hp < me.maxHp
 
-  // 席德：多的手牌換血
-  if (me.character === 'sid' && me.hp < me.maxHp && v.hand.length >= 4) {
-    const two = [...v.hand].sort((a, b) => value(v, a) - value(v, b)).slice(0, 2)
-    if (two.every((c) => value(v, c) < 3)) return { type: 'ability', ability: 'sid', cards: two.map((c) => c.id) }
+  // 西部法則：必須先打出亮出的牌
+  if (v.must != null) {
+    const forced = legal.filter((l) => l.card === v.must)
+    if (forced.length) {
+      const l = forced[0]
+      const t = l.targets ? (enemies(v, l.targets)[0]?.seat ?? mostHostile(v, l.targets)) : undefined
+      return play(v, l, t, t != null && l.pickCard ? pickTargetCard(v.players[t], !!l.tableOnly) : undefined)
+    }
+  }
+
+  // 角色能力
+  for (const ab of v.abilities) {
+    if (ab.id === 'sid' && hurt && v.hand.length >= 4) {
+      const two = [...v.hand].sort((a, b) => value(v, a) - value(v, b)).slice(0, 2)
+      if (two.every((c) => value(v, c) < 3)) return { type: 'ability', ability: 'sid', cards: two.map((c) => c.id) }
+    }
+    if (ab.id === 'chuck' && me.hp >= 3 && v.hand.length <= 3 && rnd() < 0.6) return { type: 'ability', ability: 'chuck' }
+    if (ab.id === 'jose') {
+      const junk = v.hand.filter((c) => ab.cardIds!.includes(c.id) && value(v, c) < 2)
+      if (junk.length) return { type: 'ability', ability: 'jose', cards: [junk[0].id] }
+    }
+    if (ab.id === 'doc' && v.hand.length >= 4) {
+      const t = enemies(v, ab.targets!)[0]
+      if (t) {
+        const two = [...v.hand].sort((a, b) => value(v, a) - value(v, b)).slice(0, 2)
+        return { type: 'ability', ability: 'doc', cards: two.map((c) => c.id), target: t.seat }
+      }
+    }
   }
 
   for (const k of PRIORITY) {
-    for (const l of byKey(k)) {
-      const c = cardOf(l)
-      if (CARD_DEFS[k].range) {
-        const r = CARD_DEFS[k].range!
+    for (const l of byAs(k)) {
+      const def = CARD_DEFS[k]
+      if (def.range) {
         const bangs = v.hand.filter((x) => x.key === 'bang').length
-        if (k === 'volcanic' ? v.myRange <= 1 && bangs >= 2 : r > v.myRange) return play(l)
+        if (k === 'volcanic' ? v.myRange <= 1 && bangs >= 2 : def.range > v.myRange) return play(v, l)
         continue
       }
-      if (k === 'beer' && me.hp >= me.maxHp) continue
-      void c
-      return play(l)
+      if ((k === 'beer' || k === 'canteen') && !hurt) continue
+      // 場上的攻擊綠牌：有敵人才用
+      if (l.source === 'table' && l.targets) {
+        const t = enemies(v, l.targets)[0]
+        if (t) return play(v, l, t.seat, l.pickCard ? pickTargetCard(t, false) : undefined)
+        continue
+      }
+      if (l.source === 'table' && k === 'howitzer' && foes.length < friends.length) continue
+      void cardOf
+      return play(v, l)
     }
   }
-  for (const l of byKey('saloon')) if (me.hp < me.maxHp || friends.some((f) => f.hp < f.maxHp)) return play(l)
-
-  for (const l of byKey('jail')) {
-    const t = enemies(v, l.targets!)[0]
-    if (t) return play(l, t.seat)
+  for (const l of byAs('whisky')) if (me.maxHp - me.hp >= 1) return play(v, l)
+  for (const l of byAs('tequila')) {
+    const t = l.targets!.map((q) => v.players[q]).filter((p) => hostility(v, p) < 0 || p.seat === v.me).sort((a, b) => a.hp - b.hp)[0]
+    if (t) return play(v, l, t.seat)
   }
-  for (const k of ['panic', 'catbalou'] as const) {
-    for (const l of byKey(k)) {
+  for (const l of byAs('saloon')) if (hurt || friends.some((f) => f.hp < f.maxHp)) return play(v, l)
+
+  for (const l of byAs('jail')) {
+    const t = enemies(v, l.targets!)[0]
+    if (t) return play(v, l, t.seat)
+  }
+  for (const k of ['panic', 'catbalou', 'ragtime'] as const) {
+    for (const l of byAs(k)) {
       const t = enemies(v, l.targets!)[0]
-      if (t) return play(l, t.seat, pickTargetCard(t))
+      if (t) return play(v, l, t.seat, pickTargetCard(t, false))
       // 幫自己人拆掉監獄或炸藥
       const f = l.targets!.map((s) => v.players[s]).find((p) => hostility(v, p) < 0 && p.table.some((c) => c.key === 'jail' || c.key === 'dynamite'))
-      if (f) return play(l, f.seat, f.table.find((c) => c.key === 'jail' || c.key === 'dynamite')!.id)
+      if (f) return play(v, l, f.seat, f.table.find((c) => c.key === 'jail' || c.key === 'dynamite')!.id)
     }
   }
-  for (const l of byKey('dynamite')) if (me.role !== 'sheriff' && others.length >= 3 && me.hp >= 3 && rnd() < 0.4) return play(l)
+  for (const l of byAs('dynamite')) if (me.role !== 'sheriff' && others.length >= 3 && me.hp >= 3 && rnd() < 0.4) return play(v, l)
 
   const foeCount = foes.length
   const friendCount = friends.length
-  for (const l of byKey('indians')) if (foeCount >= friendCount) return play(l)
-  for (const l of byKey('gatling')) if (foeCount >= friendCount) return play(l)
+  for (const k of ['indians', 'gatling', 'brawl'] as const) for (const l of byAs(k)) if (foeCount >= friendCount) return play(v, l)
 
   const myBangs = v.hand.filter((c) => c.key === 'bang' || (me.character === 'calamity' && c.key === 'missed')).length
-  for (const l of byKey('duel')) {
+  for (const l of byAs('duel')) {
     const t = enemies(v, l.targets!)[0]
-    if (t && myBangs >= 1 && t.handCount <= 4) return play(l, t.seat)
+    if (t && myBangs >= 1 && t.handCount <= 4) return play(v, l, t.seat)
   }
-  for (const l of byKey('bang')) {
+  for (const k of ['punch', 'springfield', 'sniper'] as const) {
+    for (const l of byAs(k)) {
+      const t = enemies(v, l.targets!)[0]
+      if (t && (k !== 'sniper' || t.handCount >= 2)) return play(v, l, t.seat)
+    }
+  }
+  for (const l of byAs('bang')) {
     const t = enemies(v, l.targets!)[0]
-    if (t) return play(l, t.seat)
-    // 警長一開始沒有線索：偶爾亂槍打鳥
+    if (t) return play(v, l, t.seat)
     if (me.role === 'sheriff' && v.turnNo > 1 && rnd() < 0.35) {
       const pick = l.targets!.filter((s) => v.players[s].rep <= 0)
-      if (pick.length) return play(l, pick[Math.floor(rnd() * pick.length)])
+      if (pick.length) return play(v, l, pick[Math.floor(rnd() * pick.length)])
     }
+  }
+  for (const l of byAs('ricochet')) {
+    const t = enemies(v, l.targets!)[0]
+    if (t && t.table.some((c) => value(v, c) >= 4)) return play(v, l, t.seat, pickTargetCard(t, true))
   }
   return { type: 'end_turn' }
 }
 
-function pickTargetCard(t: PublicPlayer): number | 'hand' {
-  const order: CardKey[] = ['barrel', 'mustang', 'volcanic', 'winchester', 'carabine', 'remington', 'scope', 'schofield']
+function pickTargetCard(t: PublicPlayer, tableOnly: boolean): number | 'hand' {
+  const order: CardKey[] = ['barrel', 'mustang', 'hideout', 'volcanic', 'winchester', 'carabine', 'remington', 'scope', 'binocular', 'schofield', 'bible', 'hat', 'ironplate', 'sombrero']
   for (const k of order) {
     const c = t.table.find((x) => x.key === k)
     if (c) return c.id
   }
-  if (t.handCount > 0) return 'hand'
+  if (!tableOnly && t.handCount > 0) return 'hand'
   const notJail = t.table.find((c) => c.key !== 'jail' && c.key !== 'dynamite')
   return (notJail ?? t.table[0]).id
 }
 
-function play(l: LegalPlay, target?: number, targetCard?: number | 'hand'): Action {
-  return { type: 'play', card: l.card, as: l.as, target, targetCard }
+function play(v: GameView, l: LegalPlay, target?: number, targetCard?: number | 'hand'): Action {
+  let extra: number[] | undefined
+  if (l.cost) {
+    const pool = v.hand.filter((c) => c.id !== l.card && (!l.costKind || c.key === 'bang' || (l.costKind === 'bang' && c.key === 'missed' && v.players[v.me].character === 'calamity')))
+    extra = [...pool].sort((a, b) => value(v, a) - value(v, b)).slice(0, l.cost).map((c) => c.id)
+  }
+  return { type: 'play', card: l.card, as: l.as, target, targetCard, extra }
 }
 
 export const charName = (id: string) => CHAR_BY_ID[id]?.name ?? id
