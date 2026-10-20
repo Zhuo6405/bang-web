@@ -1,6 +1,11 @@
 /** 用 Web Audio 即時合成的音效：不需要任何音檔 */
 
 export type Sfx =
+  | 'cylOpen' // 甩出轉輪
+  | 'load' // 裝一發子彈
+  | 'spin' // 轉輪轉動
+  | 'cylClose' // 合上轉輪
+  | 'cock' // 扳起擊錘
   | 'gunshot'
   | 'ricochet'
   | 'boom'
@@ -132,6 +137,26 @@ export function play(s: Sfx) {
   lastAt = { ...lastAt, [s]: now }
   const t = ctx.currentTime + 0.01
   switch (s) {
+    case 'cylOpen':
+      noise(t, 0.05, { vol: 0.35, from: 4200, q: 3 })
+      noise(t + 0.03, 0.12, { vol: 0.12, from: 2400, to: 1200, q: 2 })
+      break
+    case 'load':
+      tone(2600, t, 0.04, { type: 'square', vol: 0.05 })
+      noise(t, 0.04, { vol: 0.3, from: 5200, q: 4 })
+      noise(t + 0.02, 0.06, { vol: 0.12, from: 1800, q: 2 })
+      break
+    case 'spin':
+      for (let i = 0; i < 9; i++) noise(t + i * 0.016, 0.012, { vol: 0.22 - i * 0.015, from: 5000, q: 5 })
+      break
+    case 'cylClose':
+      noise(t, 0.05, { vol: 0.45, from: 3200, q: 2.5 })
+      tone(900, t, 0.05, { type: 'square', vol: 0.05 })
+      break
+    case 'cock':
+      noise(t, 0.03, { vol: 0.4, from: 3600, q: 4 })
+      noise(t + 0.07, 0.035, { vol: 0.5, from: 2800, q: 4 })
+      break
     case 'gunshot':
       noise(t, 0.05, { vol: 0.9, from: 3000, q: 0.5, type: 'highpass' })
       noise(t, 0.35, { vol: 0.8, from: 900, to: 120, type: 'lowpass' })

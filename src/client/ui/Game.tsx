@@ -8,6 +8,7 @@ import { useLocalController, useSecondsLeft, type GameController, type Social } 
 import { DocsButtons } from './Docs'
 import { recordResult } from './history'
 import { ChatPanel, VoiceControls } from './social'
+import { GUN } from '../three/gunTiming'
 import { useGameSounds, useSoundOn } from './useGameSounds'
 
 // 3D 場景比較大，進牌桌時才載入
@@ -319,6 +320,7 @@ function useHurtFlash(v: GameView) {
   const [on, setOn] = useState(false)
   const seen = useRef(-1)
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const shotAt = useRef(0)
   useEffect(() => () => clearTimeout(timer.current), [])
   useEffect(() => {
     const last = v.fx.length ? v.fx[v.fx.length - 1].seq : 0
@@ -326,12 +328,18 @@ function useHurtFlash(v: GameView) {
       seen.current = last
       return
     }
-    const hit = v.fx.some((f) => f.seq > seen.current && (f.kind === 'hit' || f.kind === 'explode') && f.to === v.me)
+    const fresh = v.fx.filter((f) => f.seq > seen.current)
     seen.current = last
+    // 有人對你開槍：記下子彈射出的時間，中彈閃紅要等到那時候
+    for (const f of fresh) if (f.kind === 'shoot' && f.to === v.me) shotAt.current = Math.max(shotAt.current, Date.now() + GUN.fire * 1000)
+    const hit = fresh.some((f) => (f.kind === 'hit' || f.kind === 'explode') && f.to === v.me)
     if (!hit) return
-    setOn(true)
+    const wait = Math.max(0, shotAt.current - Date.now())
     clearTimeout(timer.current)
-    timer.current = setTimeout(() => setOn(false), 600)
+    timer.current = setTimeout(() => {
+      setOn(true)
+      timer.current = setTimeout(() => setOn(false), 600)
+    }, wait)
   }, [v.fx, v.me])
   return on
 }

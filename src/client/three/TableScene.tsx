@@ -3,6 +3,7 @@ import { Html, OrbitControls } from '@react-three/drei'
 import { Canvas, useFrame, useThree, type ThreeElements } from '@react-three/fiber'
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import * as THREE from 'three'
+import { GUN, smooth } from './gunTiming'
 import { clampedPosition, keepVisible } from './plateClamp'
 import { CARD_DEFS, CHAR_BY_ID, EVENT_BY_ID, GOLD_DEFS, ROLE_NAME } from '../../engine/data'
 import type { Card, Fx } from '../../engine/types'
@@ -18,8 +19,7 @@ const COATS = ['#6b4a2e', '#3f4a5a', '#7a3b2a', '#4d5233', '#5b4a6b', '#2e4a48',
 const BANDANAS = ['#a3262a', '#1f4e8a', '#c9a227', '#2f6b3a', '#7b2a6b', '#d0662a', '#e8e0d0', '#222']
 const HATS = ['#3a2516', '#1e1a18', '#5a3d22', '#2a2a2a', '#6b4a2e', '#1f1a14', '#4a3018', '#2b2116']
 
-const AIM_TIME = 1.5 // 舉槍持續秒數
-const FIRE_AT = 0.45 // 舉槍後多久開火
+const FIRE_AT = GUN.fire // 舉槍後多久開火（中間要先裝子彈）
 
 function seatAngle(seat: number, me: number, n: number) {
   return (((seat - me + n) % n) / n) * Math.PI * 2
@@ -34,8 +34,10 @@ const PlateHost = createContext<RefObject<HTMLDivElement | null> | null>(null)
 // ───────── 特效排程：把引擎的 fx 轉成動畫事件 ─────────
 
 interface Aim {
-  target: number
   t0: number
+  /** 這次舉槍要開的每一槍 */
+  shots: { target: number; at: number }[]
+  until: number
 }
 interface Pop {
   id: number
@@ -88,25 +90,46 @@ function useFxDirector(v: GameView, clockNow: () => number) {
 }
 
 let uid = 1
+/** 中彈／躲開的反應要等子彈真的射出去之後 */
+function afterShot(d: Director, f: Fx, t: number) {
+  if (f.from == null || f.to == null) return 0
+  const s = d.aims.get(f.from)?.shots.find((x) => x.target === f.to && x.at > t)
+  return s ? s.at - t + 0.06 : 0
+}
 function apply(d: Director, f: Fx, t: number) {
   const pop = (seat: number, text: string, colour: string, dt = 0) => d.pops.push({ id: uid++, seat, text, colour, t0: t + dt })
   switch (f.kind) {
-    case 'shoot':
+    case 'shoot': {
       if (f.from == null || f.to == null) return
-      d.aims.set(f.from, { target: f.to, t0: t })
-      d.shots.push({ id: uid++, from: f.from, to: f.to, t0: t + FIRE_AT })
-      pop(f.from, '砰！', '#ffcf5a', FIRE_AT)
+      // 同一個人還拿著槍（格林機槍連發）：不用再裝子彈，接著開下一槍
+      const cur = d.aims.get(f.from)
+      let at: number
+      if (cur && t < cur.until) {
+        at = Math.max(cur.shots[cur.shots.length - 1].at + GUN.repeat, t)
+        cur.shots.push({ target: f.to, at })
+        cur.until = at + GUN.hold
+      } else {
+        at = t + FIRE_AT
+        d.aims.set(f.from, { t0: t, shots: [{ target: f.to, at }], until: at + GUN.hold })
+      }
+      d.shots.push({ id: uid++, from: f.from, to: f.to, t0: at })
+      pop(f.from, '砰！', '#ffcf5a', at - t)
       return
-    case 'miss':
+    }
+    case 'miss': {
       if (f.to == null) return
-      pop(f.to, '射偏了！', '#cfe8ff')
-      d.dodge.set(f.to, t)
+      const dt = afterShot(d, f, t)
+      pop(f.to, '射偏了！', '#cfe8ff', dt)
+      d.dodge.set(f.to, t + dt)
       return
-    case 'hit':
+    }
+    case 'hit': {
       if (f.to == null) return
-      pop(f.to, `-${f.amount ?? 1}`, '#ff5a4a')
-      d.flashes.push({ id: uid++, seat: f.to, kind: 'hit', t0: t })
+      const dt = afterShot(d, f, t)
+      pop(f.to, `-${f.amount ?? 1}`, '#ff5a4a', dt)
+      d.flashes.push({ id: uid++, seat: f.to, kind: 'hit', t0: t + dt })
       return
+    }
     case 'heal':
       if (f.to == null) return
       pop(f.to, `+${f.amount ?? 1}`, '#7fe08a')
@@ -408,25 +431,60 @@ function Limb({ from, to, r, color, opacity }: { from: THREE.Vector3; to: THREE.
   )
 }
 
-/** 左輪手槍：槍管朝 -y（跟手臂同方向） */
-function Revolver({ scale = 1 }: { scale?: number }) {
+/** 左輪手槍的活動零件，由動畫每一幀更新 */
+interface GunRig {
+  cyl: THREE.Group | null
+  hammer: THREE.Group | null
+  rounds: (THREE.Mesh | null)[]
+}
+const CHAMBERS = 6
+
+/** 左輪手槍：槍管朝 -y（跟手臂同方向）。轉輪可以甩出來裝子彈 */
+function Revolver({ scale = 1, rig }: { scale?: number; rig?: GunRig }) {
   return (
     <group scale={scale} rotation-x={Math.PI / 2}>
       {/* 槍管 */}
       <mesh position={[0, 0.03, 0.15]} rotation-x={Math.PI / 2} castShadow>
         <cylinderGeometry args={[0.018, 0.018, 0.24, 10]} />
-        <meshStandardMaterial color="#2b2b2e" metalness={0.85} roughness={0.3} />
+        <meshStandardMaterial color="#5d626b" metalness={0.75} roughness={0.32} />
       </mesh>
-      {/* 轉輪 */}
-      <mesh position={[0, 0.03, 0.02]} rotation-x={Math.PI / 2} castShadow>
-        <cylinderGeometry args={[0.04, 0.04, 0.07, 12]} />
-        <meshStandardMaterial color="#3a3a3e" metalness={0.85} roughness={0.35} />
-      </mesh>
+      {/* 轉輪（含六個彈巢與子彈） */}
+      <group position={[0, 0.03, 0.02]} ref={(g) => void (rig && (rig.cyl = g))}>
+        <mesh rotation-x={Math.PI / 2} castShadow>
+          <cylinderGeometry args={[0.04, 0.04, 0.07, 12]} />
+          <meshStandardMaterial color="#7a7f88" metalness={0.8} roughness={0.28} />
+        </mesh>
+        {Array.from({ length: CHAMBERS }, (_, i) => {
+          const a = (i / CHAMBERS) * Math.PI * 2
+          return (
+            <mesh key={`h${i}`} position={[Math.cos(a) * 0.024, Math.sin(a) * 0.024, -0.036]} rotation-x={Math.PI / 2}>
+              <cylinderGeometry args={[0.01, 0.01, 0.004, 10]} />
+              <meshStandardMaterial color="#0a0a0a" />
+            </mesh>
+          )
+        })}
+        {[0, 1, 2].map((i) => {
+          const a = (i / CHAMBERS) * Math.PI * 2
+          return (
+            <mesh key={`r${i}`} ref={(m) => void (rig && (rig.rounds[i] = m))} position={[Math.cos(a) * 0.024, Math.sin(a) * 0.024, -0.036]} rotation-x={Math.PI / 2} visible={false}>
+              <cylinderGeometry args={[0.0095, 0.0095, 0.036, 10]} />
+              <meshStandardMaterial color="#f0c050" metalness={0.85} roughness={0.2} emissive="#7a5010" emissiveIntensity={0.8} />
+            </mesh>
+          )
+        })}
+      </group>
       {/* 槍身 */}
       <mesh position={[0, 0.035, -0.04]} castShadow>
         <boxGeometry args={[0.035, 0.06, 0.08]} />
-        <meshStandardMaterial color="#2b2b2e" metalness={0.8} roughness={0.35} />
+        <meshStandardMaterial color="#545961" metalness={0.75} roughness={0.35} />
       </mesh>
+      {/* 擊錘 */}
+      <group position={[0, 0.06, -0.075]} ref={(g) => void (rig && (rig.hammer = g))}>
+        <mesh position={[0, 0.015, 0]}>
+          <boxGeometry args={[0.012, 0.035, 0.014]} />
+          <meshStandardMaterial color="#545961" metalness={0.75} roughness={0.35} />
+        </mesh>
+      </group>
       {/* 木握把 */}
       <mesh position={[0, -0.03, -0.075]} rotation-x={-0.45} castShadow>
         <boxGeometry args={[0.032, 0.12, 0.045]} />
@@ -434,6 +492,37 @@ function Revolver({ scale = 1 }: { scale?: number }) {
       </mesh>
     </group>
   )
+}
+
+/** 依時間軸擺動轉輪、子彈、擊錘。age = 舉槍後經過的秒數 */
+function animateGun(rig: GunRig, age: number, aim: Aim | undefined, now: number) {
+  const reload = !aim || aim.shots.length === 0 || age < GUN.fire + 0.05
+  // 轉輪甩出來（往左邊）再合上
+  const open = smooth(GUN.open[0], GUN.open[1], age) * (1 - smooth(GUN.spin[1] - 0.04, GUN.close + 0.05, age))
+  if (rig.cyl) {
+    rig.cyl.position.set(-0.06 * open, 0.03 - 0.025 * open, 0.02)
+    rig.cyl.rotation.y = -0.5 * open
+    // 裝完子彈轉一圈；之後每開一槍轉一格
+    const spin = smooth(GUN.spin[0], GUN.spin[1], age) * Math.PI * 2
+    const fired = aim ? aim.shots.filter((s) => now >= s.at).length : 0
+    rig.cyl.rotation.z = spin + (fired * Math.PI * 2) / CHAMBERS
+  }
+  // 子彈從後面滑進彈巢
+  GUN.rounds.forEach(([a, b], i) => {
+    const m = rig.rounds[i]
+    if (!m) return
+    const k = smooth(a, b, age)
+    m.visible = age >= a && reload
+    const ang = (i / CHAMBERS) * Math.PI * 2
+    m.position.set(Math.cos(ang) * 0.024, Math.sin(ang) * 0.024, -0.036 - (1 - k) * 0.09)
+  })
+  // 擊錘：扳起，開火時打下去
+  if (rig.hammer) {
+    const cock = smooth(GUN.cock[0], GUN.cock[1], age)
+    const next = aim?.shots.find((s) => now < s.at + 0.06)
+    const down = next && now >= next.at ? 1 : 0
+    rig.hammer.rotation.x = -0.9 * cock * (1 - down)
+  }
 }
 
 const ARM_LEN = 0.6
@@ -477,7 +566,10 @@ function Figure({
   const seat = p.seat
   const coat = COATS[seat % COATS.length]
   const restDir = useMemo(() => new THREE.Vector3(-0.35, -0.7, 0.62).normalize(), [])
+  /** 裝子彈時把槍舉在胸前 */
+  const loadDir = useMemo(() => new THREE.Vector3(-0.45, -0.15, 0.88).normalize(), [])
   const q = useMemo(() => new THREE.Quaternion(), [])
+  const rig = useMemo<GunRig>(() => ({ cyl: null, hammer: null, rounds: [] }), [])
   useFrame(({ clock }) => {
     if (!body.current || !head.current || !gunArm.current) return
     const now = clock.elapsedTime
@@ -497,14 +589,21 @@ function Figure({
     let aiming = false
     if (aim && !dead) {
       const age = now - aim.t0
-      if (age >= 0 && age < AIM_TIME) {
+      if (age >= 0 && now < aim.until) {
         aiming = true
-        const d = localDir(theta, seatAngle(aim.target, me, n))
+        // 正在瞄準的目標：下一槍的對象（開完就看最後一槍）
+        const shot = aim.shots.find((s) => now < s.at + 0.12) ?? aim.shots[aim.shots.length - 1]
+        const d = localDir(theta, seatAngle(shot.target, me, n))
         // 開火後的後座力
-        const kick = age > FIRE_AT && age < FIRE_AT + 0.18 ? Math.sin(((age - FIRE_AT) / 0.18) * Math.PI) * 0.35 : 0
-        want = d.clone().add(new THREE.Vector3(0, kick, 0)).normalize()
-        head.current.rotation.y = Math.atan2(d.x, d.z) * 0.8
-      } else if (age >= AIM_TIME) dir.aims.delete(seat)
+        const last = [...aim.shots].reverse().find((s) => now >= s.at)
+        const kick = last && now - last.at < 0.18 ? Math.sin(((now - last.at) / 0.18) * Math.PI) * 0.35 : 0
+        const turn = smooth(GUN.cock[0] - 0.05, GUN.cock[1], age)
+        want = loadDir.clone().lerp(d, turn).add(new THREE.Vector3(0, kick, 0)).normalize()
+        head.current.rotation.y = Math.atan2(want.x, want.z) * 0.8
+        // 裝子彈時低頭看槍
+        head.current.rotation.x = (1 - turn) * 0.35
+        animateGun(rig, age, aim, now)
+      } else if (now >= aim.until) dir.aims.delete(seat)
     }
     q.setFromUnitVectors(DOWN, want)
     gunArm.current.quaternion.slerp(q, reduced ? 1 : aiming ? 0.25 : 0.1)
@@ -594,7 +693,7 @@ function Figure({
               <meshStandardMaterial color={skin} transparent={tr} opacity={opacity} />
             </mesh>
             <group ref={gunInHand} position={[0, -ARM_LEN - 0.02, 0.02]} visible={false}>
-              <Revolver scale={1.4} />
+              <Revolver scale={1.5} rig={rig} />
             </group>
           </group>
           {/* 頭與牛仔帽 */}
@@ -803,26 +902,46 @@ function MyHand({ v, selected }: { v: GameView; selected: number | null }) {
   const spread = Math.min(0.3 * Math.max(0, n - 1), 1.9)
   const coat = COATS[v.me % COATS.length]
   const gun = useRef<THREE.Group>(null)
+  const rig = useMemo<GunRig>(() => ({ cyl: null, hammer: null, rounds: [] }), [])
+  const sleeve = useRef<THREE.Mesh>(null)
+  const lamp = useRef<THREE.PointLight>(null)
   const meAlive = v.players[v.me]?.alive
-  useFrame(({ clock }) => {
+  useFrame(({ clock, camera }) => {
     const g = gun.current
     if (!g) return
     const aim = dir.aims.get(v.me)
     const now = clock.elapsedTime
     const age = aim ? now - aim.t0 : Infinity
-    const on = age >= 0 && age < AIM_TIME
+    const on = !!aim && age >= 0 && now < aim.until
     g.visible = on
-    if (!on || !aim) return
-    // 舉起來指向目標
-    const theta = seatAngle(aim.target, v.me, v.players.length)
-    const target = polar(theta, SEAT_R, 1.5)
-    const from = new THREE.Vector3(0.28, 1.95, SEAT_R - 0.35)
-    const lift = Math.min(1, age / 0.3)
-    g.position.set(from.x, from.y - (1 - lift) * 0.4, from.z)
-    const d = target.clone().sub(from).normalize()
-    const kick = age > FIRE_AT && age < FIRE_AT + 0.18 ? Math.sin(((age - FIRE_AT) / 0.18) * Math.PI) * 0.3 : 0
-    d.y += kick
-    g.quaternion.setFromUnitVectors(DOWN, d.normalize())
+    if (!on || !aim) {
+      if (aim && now >= aim.until) dir.aims.delete(v.me)
+      return
+    }
+    // 裝子彈的位置：鏡頭正前方偏下，側面朝向你，看得到轉輪
+    const fwd = new THREE.Vector3()
+    camera.getWorldDirection(fwd)
+    const right = new THREE.Vector3().crossVectors(fwd, camera.up).normalize()
+    const up = new THREE.Vector3().crossVectors(right, fwd).normalize()
+    const loadPos = camera.position.clone().addScaledVector(fwd, 0.2).addScaledVector(up, -0.12).addScaledVector(right, 0.26)
+    // 槍口朝左前方，轉輪後面（彈巢）朝向你，看得到子彈一發一發塞進去
+    const loadDir = fwd.clone().multiplyScalar(0.75).addScaledVector(right, -0.55).addScaledVector(up, -0.12).normalize()
+    // 瞄準的位置與方向
+    const shot = aim.shots.find((s) => now < s.at + 0.12) ?? aim.shots[aim.shots.length - 1]
+    const target = polar(seatAngle(shot.target, v.me, v.players.length), SEAT_R, 1.5)
+    const aimPos = new THREE.Vector3(0.28, 1.95, SEAT_R - 0.35)
+    const aimDir = target.clone().sub(aimPos).normalize()
+    const last = [...aim.shots].reverse().find((s) => now >= s.at)
+    if (last && now - last.at < 0.18) aimDir.y += Math.sin(((now - last.at) / 0.18) * Math.PI) * 0.3
+    // 從下方拔出 → 裝子彈 → 轉去瞄準
+    const lift = smooth(0, GUN.draw, age)
+    const turn = smooth(GUN.cock[0] - 0.05, GUN.cock[1], age)
+    const pos = loadPos.clone().addScaledVector(up, -(1 - lift) * 0.35).lerp(aimPos, turn)
+    g.position.copy(pos)
+    g.quaternion.setFromUnitVectors(DOWN, loadDir.clone().lerp(aimDir, turn).normalize())
+    if (sleeve.current) sleeve.current.visible = turn > 0.6
+    if (lamp.current) lamp.current.intensity = 2.2 * (1 - turn) * lift
+    animateGun(rig, age, aim, now)
   })
   if (!meAlive) return null
   return (
@@ -855,7 +974,8 @@ function MyHand({ v, selected }: { v: GameView; selected: number | null }) {
       </group>
       {/* 開槍時舉起的右手 */}
       <group ref={gun} visible={false}>
-        <mesh position={[0, -0.12, 0]}>
+        <pointLight ref={lamp} position={[0.12, -0.2, 0.15]} intensity={0} distance={0.8} decay={1.5} color="#ffe2b0" />
+        <mesh ref={sleeve} position={[0, -0.12, 0]}>
           <capsuleGeometry args={[0.05, 0.22, 6, 12]} />
           <meshStandardMaterial color={coat} roughness={0.9} />
         </mesh>
@@ -864,7 +984,7 @@ function MyHand({ v, selected }: { v: GameView; selected: number | null }) {
           <meshStandardMaterial color="#d8a27a" />
         </mesh>
         <group position={[0, -0.28, 0.01]}>
-          <Revolver scale={0.8} />
+          <Revolver scale={0.9} rig={rig} />
         </group>
       </group>
     </group>

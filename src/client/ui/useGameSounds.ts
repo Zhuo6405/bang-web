@@ -3,7 +3,9 @@ import type { GameView } from '../../engine/view'
 import type { ChatMsg } from '../../shared/protocol'
 import { onSoundChange, play, setSoundOn, soundOn, type Sfx } from '../sound'
 
-const FIRE_DELAY = 450 // 跟 3D 場景的開火時間對齊
+import { GUN } from '../three/gunTiming'
+
+const ms = (sec: number) => Math.round(sec * 1000)
 
 /** 依引擎的 fx 事件發出音效 */
 export function useGameSounds(v: GameView, chat: ChatMsg[] | undefined, myClientId: string | undefined) {
@@ -11,6 +13,10 @@ export function useGameSounds(v: GameView, chat: ChatMsg[] | undefined, myClient
   const prevDecision = useRef<string>('')
   const prevResult = useRef(false)
   const timers = useRef<ReturnType<typeof setTimeout>[]>([])
+  /** 每個人最近一槍的開火時間（毫秒時間戳），連發時不再裝子彈 */
+  const lastShot = useRef(new Map<number, number>())
+  /** 每個「開槍者→目標」預定的開火時間，中彈／躲開的聲音要排在後面 */
+  const pending = useRef(new Map<string, number>())
   useEffect(() => () => timers.current.forEach(clearTimeout), [])
   useEffect(() => {
     if (seen.current < 0) {
@@ -18,19 +24,44 @@ export function useGameSounds(v: GameView, chat: ChatMsg[] | undefined, myClient
       prevResult.current = !!v.result
       return
     }
-    const later = (s: Sfx, ms: number) => timers.current.push(setTimeout(() => play(s), ms))
-    let delay = 0
+    const later = (s: Sfx, delay: number) => timers.current.push(setTimeout(() => play(s), Math.max(0, delay)))
+    const now = Date.now()
+    /** 等子彈射出去之後才播的聲音 */
+    const afterShot = (from: number | undefined, to: number | undefined) => {
+      if (from == null || to == null) return 0
+      const at = pending.current.get(`${from}-${to}`)
+      return at && at > now ? at - now + 60 : 0
+    }
+    let stagger = 0
     for (const f of v.fx.filter((x) => x.seq > seen.current)) {
       switch (f.kind) {
-        case 'shoot':
-          later('gunshot', FIRE_DELAY + delay)
-          delay += 150
+        case 'shoot': {
+          if (f.from == null) break
+          const prev = lastShot.current.get(f.from) ?? 0
+          let at: number
+          if (prev + ms(GUN.hold) > now + stagger) {
+            // 槍還在手上：直接接著開
+            at = Math.max(prev + ms(GUN.repeat), now + stagger)
+          } else {
+            const t0 = now + stagger
+            at = t0 + ms(GUN.fire)
+            later('cylOpen', t0 - now + ms(GUN.open[0]))
+            GUN.rounds.forEach(([, done]) => later('load', t0 - now + ms(done)))
+            later('spin', t0 - now + ms(GUN.spin[0]))
+            later('cylClose', t0 - now + ms(GUN.close))
+            later('cock', t0 - now + ms(GUN.cock[0]))
+          }
+          lastShot.current.set(f.from, at)
+          if (f.to != null) pending.current.set(`${f.from}-${f.to}`, at)
+          later('gunshot', at - now)
+          stagger += 150
           break
+        }
         case 'miss':
-          later('ricochet', 60)
+          later('ricochet', afterShot(f.from, f.to) + 60)
           break
         case 'hit':
-          later('grunt', 40)
+          later('grunt', afterShot(f.from, f.to) + 40)
           break
         case 'heal':
           play('gulp')
