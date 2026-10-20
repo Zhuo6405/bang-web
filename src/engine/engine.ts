@@ -15,6 +15,7 @@ import {
   SUIT_NAME,
 } from './data'
 import type {
+  CoinDuel,
   AbilityId,
   Action,
   Ask,
@@ -289,14 +290,14 @@ export function startGame(config: GameConfig): GameState {
   s.deck = shuffle(s, s.cards.map((c) => c.id))
   const roles = shuffle(s, [...ROLE_SETUP[n]])
   const pool = CHARACTERS.filter((c) => c.set === 'base' || exp.includes(c.set)).map((c) => c.id)
-  const chars = shuffle(s, pool)
+  s.pick = { pool, picks: Array(n).fill(null), round: 1, duels: [] }
   s.players = config.names.map((name, seat) => ({
     seat,
     name,
     isAI: !!config.ai[seat],
     role: roles[seat],
     character: null,
-    charOptions: [chars[(seat * 2) % chars.length], chars[(seat * 2 + 1) % chars.length]],
+    charOptions: [],
     hp: 0,
     maxHp: 0,
     hand: [],
@@ -319,11 +320,68 @@ export function startGame(config: GameConfig): GameState {
   }
   const sheriff = s.players.find((p) => p.role === 'sheriff')!
   s.turn.active = sheriff.seat
-  log(s, `${sheriff.name} 是警長。每個人從兩張角色中挑一張。`)
+  log(s, `${sheriff.name} 是警長。每個人挑一個角色；撞角的人擲硬幣決定。`)
   return s
 }
 
+/** 這一輪還能選的角色：已經定案的不能再選 */
+function pickOptions(s: GameState) {
+  const taken = new Set(s.players.map((p) => p.character).filter(Boolean))
+  return (s.pick?.pool ?? []).filter((c) => !taken.has(c))
+}
+
+/** 擲硬幣決定誰拿到：兩人時人頭贏；三人以上每人擲 3 枚，人頭多的贏，平手的人再擲 */
+function coinDuel(s: GameState, char: string, seats: number[]): CoinDuel {
+  const rounds: CoinDuel['rounds'] = []
+  let left = [...seats]
+  for (let guard = 0; guard < 30 && left.length > 1; guard++) {
+    const k = left.length === 2 ? 1 : 3
+    const flips = left.map((seat) => ({ seat, coins: Array.from({ length: k }, () => rand(s) < 0.5) }))
+    rounds.push(flips)
+    const heads = (f: (typeof flips)[number]) => f.coins.filter(Boolean).length
+    const best = Math.max(...flips.map(heads))
+    const top = flips.filter((f) => heads(f) === best).map((f) => f.seat)
+    // 兩人都人頭或都反面：重擲
+    if (k === 1 && top.length !== 1) continue
+    left = top
+  }
+  const winner = left.length === 1 ? left[0] : left[Math.floor(rand(s) * left.length)]
+  return { char, seats, rounds, winner }
+}
+
+function resolvePicks(s: GameState) {
+  const pk = s.pick!
+  const by = new Map<string, number[]>()
+  s.players.forEach((p, seat) => {
+    const c = pk.picks[seat]
+    if (!p.character && c) by.set(c, [...(by.get(c) ?? []), seat])
+  })
+  pk.duels = []
+  for (const [char, seats] of by) {
+    const name = CHAR_BY_ID[char].name
+    if (seats.length === 1) {
+      s.players[seats[0]].character = char
+      log(s, `${s.players[seats[0]].name} 選定【${name}】。`)
+      continue
+    }
+    const d = coinDuel(s, char, seats)
+    pk.duels.push(d)
+    s.players[d.winner].character = char
+    log(s, `${seats.map((x) => s.players[x].name).join('、')} 都選了【${name}】，擲硬幣後由 ${s.players[d.winner].name} 拿到。`)
+  }
+  pk.picks = pk.picks.map(() => null)
+  pk.round++
+  if (s.players.every((x) => x.character)) afterCharacters(s)
+  else log(s, `第 ${pk.round} 輪選角：沒選到的人從剩下的角色再挑一次。`)
+}
+
 function afterCharacters(s: GameState) {
+  // 「新身份」事件需要第二個角色：從沒人用的角色隨機發一張
+  const used = new Set(s.players.map((p) => p.character))
+  const spare = shuffle(s, (s.pick?.pool ?? []).filter((c) => !used.has(c)))
+  s.players.forEach((p, i) => {
+    p.charOptions = spare[i] ? [p.character!, spare[i]] : [p.character!]
+  })
   for (const p of s.players) {
     const c = CHAR_BY_ID[p.character!]
     p.maxHp = c.hp + (p.role === 'sheriff' ? 1 : 0)
@@ -830,7 +888,8 @@ export function askView(s: GameState, a: Ask): AskView {
 export function getDecisions(s: GameState): Decision[] {
   if (s.result) return []
   if (s.turn.phase === 'choose') {
-    return s.players.filter((p) => !p.character).map((p) => ({ type: 'choose_character', player: p.seat, options: p.charOptions }))
+    const opts = pickOptions(s)
+    return s.players.filter((p) => !p.character && !s.pick?.picks[p.seat]).map((p) => ({ type: 'choose_character', player: p.seat, options: opts }))
   }
   const head = s.q[0]
   if (head?.k === 'ask') return [{ type: 'ask', player: head.player, ask: askView(s, head) }]
@@ -847,9 +906,9 @@ export function applyAction(state: GameState, p: number, a: Action): GameState {
   const me = s.players[p]
   switch (dec!.type) {
     case 'choose_character':
-      if (a.type !== 'choose_character' || !me.charOptions.includes(a.character)) fail('請從兩張角色中選一張')
-      me.character = (a as { character: string }).character
-      if (s.players.every((x) => x.character)) afterCharacters(s)
+      if (a.type !== 'choose_character' || !(dec as { options: string[] }).options.includes(a.character)) fail('這個角色不能選')
+      s.pick!.picks[p] = (a as { character: string }).character
+      if (s.players.every((x, i) => x.character || s.pick!.picks[i])) resolvePicks(s)
       return s
     case 'ask':
       if (a.type === 'ability') {

@@ -6,6 +6,7 @@ import type { GameView } from '../../engine/view'
 import { CardFace, RoleBadge } from './components'
 import { useLocalController, useSecondsLeft, type GameController, type Social } from './controller'
 import { DocsButtons } from './Docs'
+import { CharacterPick, DuelOverlay } from './PickScreen'
 import { recordResult } from './history'
 import { ChatPanel, VoiceControls } from './social'
 import { GUN } from '../three/gunTiming'
@@ -53,49 +54,19 @@ export function GameScreen({
   useEffect(() => {
     if (v.result) recordResult(v, social ? 'online' : 'local', historyId)
   }, [v, social, historyId])
-  if (v.phase === 'choose' && v.decision?.type === 'choose_character') {
-    return <CharacterPick v={v} act={ctl.act} deadline={ctl.deadline} />
-  }
-  if (v.phase === 'choose') {
+  if (v.phase === 'choose' && v.pick) {
     return (
-      <main className="pick">
-        <p className="pick-wait">等待其他玩家挑選角色…</p>
-      </main>
+      <>
+        <CharacterPick v={v} act={ctl.act} deadline={ctl.deadline} />
+        <DuelOverlay v={v} />
+      </>
     )
   }
-  return <Table ctl={ctl} social={social} onExit={onExit} exitLabel={exitLabel} resultActions={resultActions} topExtra={topExtra} />
-}
-
-function CharacterPick({ v, act, deadline }: { v: GameView; act: (a: Action) => void; deadline: number | null }) {
-  const left = useSecondsLeft(deadline)
-  const me = v.players[v.me]
-  const sheriff = v.players.find((p) => p.role === 'sheriff')
   return (
-    <main className="pick">
-      <h1>挑選你的角色</h1>
-      <p className="pick-sub">
-        你的身份是 <RoleBadge role={me.role!} />：{ROLE_GOAL[me.role!]}
-        {sheriff && sheriff.seat !== v.me && `　警長是 ${sheriff.name}。`}
-        {left != null && <span className="countdown">剩 {left} 秒</span>}
-      </p>
-      <div className="pick-row">
-        {v.myCharOptions.map((id) => {
-          const c = CHAR_BY_ID[id]
-          return (
-            <button key={id} type="button" className="char-card" onClick={() => act({ type: 'choose_character', character: id })}>
-              <span className="char-name">{c.name}</span>
-              <span className="char-meta">
-                生命 {c.hp}
-                {me.role === 'sheriff' ? '（警長 +1）' : ''}
-              </span>
-              <span className="char-sec">能力</span>
-              <span className="char-text">{c.text}</span>
-              <span className="char-go">選擇{c.name}</span>
-            </button>
-          )
-        })}
-      </div>
-    </main>
+    <>
+      <Table ctl={ctl} social={social} onExit={onExit} exitLabel={exitLabel} resultActions={resultActions} topExtra={topExtra} />
+      <DuelOverlay v={v} />
+    </>
   )
 }
 
@@ -130,6 +101,12 @@ function Table({
   const [tab, setTab] = useState<'log' | 'chat'>('log')
   const [seenChat, setSeenChat] = useState(0)
   const [sideOpen, setSideOpen] = useState(false)
+  const [inspect, setInspect] = useState<number | null>(null)
+  useEffect(() => {
+    const on = (e: Event) => setInspect((e as CustomEvent<number>).detail)
+    window.addEventListener('bang-inspect', on)
+    return () => window.removeEventListener('bang-inspect', on)
+  }, [])
   const [viewMode, setViewMode] = useState<'first' | 'overview'>(() => {
     try {
       return localStorage.getItem('bang-view') === 'overview' ? 'overview' : 'first'
@@ -253,6 +230,9 @@ function Table({
         <button type="button" className="ghost sound-btn" onClick={() => setSoundOn(!soundOn)} aria-pressed={soundOn}>
           {soundOn ? '音效 開' : '音效 關'}
         </button>
+        <button type="button" className="ghost" onClick={() => setInspect(v.me)}>
+          角色能力
+        </button>
         <DocsButtons />
         <button type="button" className="ghost side-toggle" onClick={() => setSideOpen((o) => !o)} aria-expanded={sideOpen}>
           {sideOpen ? '收起' : '紀錄與聊天'}
@@ -275,6 +255,11 @@ function Table({
               牌堆 {v.deckCount}．{v.dir === -1 ? '逆時針．' : ''}拖曳可{viewMode === 'first' ? '轉頭' : '旋轉視角'}
             </p>
           </div>
+          {me.alive && me.table.some((c) => c.key === 'jail') && (
+            <div className="jail-bars" aria-label="你被關在監獄裡">
+              <span>你被關進監獄了！回合開始時抽判定：紅心才能越獄</span>
+            </div>
+          )}
           <div className="stage-view">
             <button type="button" onClick={toggleView} aria-pressed={viewMode === 'overview'}>
               {viewMode === 'first' ? '切換到俯瞰視角' : '切換到第一人稱'}
@@ -306,6 +291,7 @@ function Table({
         </aside>
       </div>
 
+      {inspect != null && <PlayersPanel v={v} focus={inspect} onClose={() => setInspect(null)} />}
       <section className={`bench ${d ? 'is-my-move' : ''}`} aria-label="你的手牌與行動">
         <Prompt
           v={v}
@@ -453,6 +439,72 @@ function Gear({ cards, fresh }: { cards: Card[]; fresh: number[] }) {
   )
 }
 
+/** 所有人的角色能力、生命與裝備（點名牌或按「角色能力」打開） */
+function PlayersPanel({ v, focus, onClose }: { v: GameView; focus: number; onClose: () => void }) {
+  const ref = useRef<HTMLLIElement>(null)
+  useEffect(() => ref.current?.scrollIntoView({ block: 'nearest' }), [focus])
+  return (
+    <div className="sheet-backdrop" onClick={onClose}>
+      <div className="sheet players-panel" role="dialog" aria-label="角色能力與裝備" onClick={(e) => e.stopPropagation()}>
+        <div className="sheet-head">
+          <b>角色能力與裝備</b>
+          <button type="button" className="sheet-close" onClick={onClose} aria-label="關閉">
+            ✕
+          </button>
+        </div>
+        <ul>
+          {v.players.map((p) => {
+            const c = p.character ? CHAR_BY_ID[p.character] : null
+            const jailed = p.alive && p.table.some((x) => x.key === 'jail')
+            return (
+              <li key={p.seat} ref={p.seat === focus ? ref : undefined} className={`pp ${p.seat === focus ? 'is-focus' : ''} ${p.alive ? '' : 'is-out'}`}>
+                <div className="pp-head">
+                  <b>{p.name}</b>
+                  {p.seat === v.me && <span className="seat-you">你</span>}
+                  {p.role && <RoleBadge role={p.role} />}
+                  {jailed && <span className="mark m-lock">監獄中</span>}
+                  {!p.alive && <span className="mark m-dead">{p.ghost ? '幽靈' : '死亡'}</span>}
+                </div>
+                <div className="pp-char">
+                  <b>{c?.name ?? '—'}</b>
+                  <span className="pp-hp" aria-label={`生命 ${p.hp}/${p.maxHp}`}>
+                    {Array.from({ length: p.maxHp }, (_, i) => (
+                      <span key={i} className={i < p.hp ? 'bullet on' : 'bullet'} />
+                    ))}
+                    <small>
+                      {Math.max(0, p.hp)}/{p.maxHp}
+                      {p.role === 'sheriff' && c ? `（${c.hp}+1 警長）` : ''}
+                    </small>
+                  </span>
+                </div>
+                {c && <p className="pp-text">{c.text}</p>}
+                {p.table.length + p.gold.length > 0 ? (
+                  <ul className="pp-gear">
+                    {p.table.map((x) => (
+                      <li key={x.id}>
+                        <span className={`gear g-${CARD_DEFS[x.key].colour}`}>{CARD_DEFS[x.key].name}</span>
+                        {CARD_DEFS[x.key].desc}
+                      </li>
+                    ))}
+                    {p.gold.map((x) => (
+                      <li key={x.uid}>
+                        <span className="gear g-gold">{GOLD_DEFS[x.key].name}</span>
+                        {GOLD_DEFS[x.key].desc}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="pp-none">沒有裝備</p>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      </div>
+    </div>
+  )
+}
+
 /** 側欄：所有人的生命、距離、裝備 */
 function Roster({ v }: { v: GameView }) {
   return (
@@ -466,6 +518,7 @@ function Roster({ v }: { v: GameView }) {
               {p.seat === v.me && <span className="seat-you">你</span>}
             </span>
             <span className="r-char">{p.character ? CHAR_BY_ID[p.character].name : ''}</span>
+            {p.character && <span className="r-ability">{CHAR_BY_ID[p.character].text}</span>}
             {p.role && <RoleBadge role={p.role} />}
             <span className="r-hp">
               {p.ghost ? '幽靈' : p.alive ? `♥ ${p.hp}/${p.maxHp}` : '已死亡'}

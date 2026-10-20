@@ -6,9 +6,9 @@ import * as THREE from 'three'
 import { GUN, smooth } from './gunTiming'
 import { clampedPosition, keepVisible } from './plateClamp'
 import { CARD_DEFS, CHAR_BY_ID, EVENT_BY_ID, GOLD_DEFS, ROLE_NAME } from '../../engine/data'
-import type { Card, Fx } from '../../engine/types'
+import type { Card, Fx, GoldKey } from '../../engine/types'
 import type { GameView, PublicPlayer } from '../../engine/view'
-import { cardBackTexture, cardTexture, clearTextures, eventTexture, wordTexture } from './textures'
+import { cardBackTexture, cardTexture, clearTextures, eventTexture, tagTexture, wordTexture } from './textures'
 
 // 3D 酒館牌桌：圍坐的牛仔、桌上的裝備、拔槍射擊
 
@@ -756,17 +756,240 @@ function HeldFan({ n }: { n: number }) {
   )
 }
 
-/** 裝備：放在座位前的桌上 */
-function TableRow({ cards, theta }: { cards: Card[]; theta: number }) {
-  const r = TABLE_R - 0.8
-  const step = 0.2
+/** 裝備：放在座位前的桌上，每件都有 3D 道具和一塊大家都看得到的名牌 */
+function TableRow({ cards, theta, gold }: { cards: Card[]; theta: number; gold: { uid: number; key: GoldKey }[] }) {
+  const r = TABLE_R - 0.78
+  const items = [...cards.map((c) => ({ id: `c${c.id}`, card: c as Card | null, gold: null as GoldKey | null })), ...gold.map((g) => ({ id: `g${g.uid}`, card: null, gold: g.key }))]
+  const step = Math.min(0.24, 1.5 / Math.max(1, items.length))
   return (
     <group>
-      {cards.map((c, i) => {
-        const off = (i - (cards.length - 1) / 2) * step
-        const p = polar(theta + off, r, TABLE_Y + 0.012 + i * 0.001)
-        return <CardMesh key={c.id} card={c} position={p} rotation={[-Math.PI / 2, 0, theta + Math.PI]} />
+      {items.map((it, i) => {
+        const a = theta + (i - (items.length - 1) / 2) * step
+        const p = polar(a, r, TABLE_Y)
+        // 名牌前後交錯，避免擠在一起看不清
+        const lift = 0.45 + (i % 2) * 0.27
+        return (
+          <group key={it.id} position={p} rotation-y={a + Math.PI}>
+            {it.card ? (
+              <>
+                <CardMesh card={it.card} w={0.4} position={[0, 0.012 + i * 0.001, 0.05]} rotation={[-Math.PI / 2, 0, 0]} />
+                <GearProp k={it.card.key} />
+              </>
+            ) : (
+              <mesh position={[0, 0.03, 0.05]} castShadow>
+                <cylinderGeometry args={[0.13, 0.15, 0.05, 6]} />
+                <meshStandardMaterial color="#d4a72c" metalness={0.8} roughness={0.3} />
+              </mesh>
+            )}
+            <GearTag card={it.card} gold={it.gold} y={lift} />
+          </group>
+        )
       })}
+    </group>
+  )
+}
+
+function GearTag({ card, gold, y }: { card: Card | null; gold: GoldKey | null; y: number }) {
+  let text = ''
+  let bg = '#efe3c4'
+  if (card) {
+    const d = CARD_DEFS[card.key]
+    text = d.range ? `${d.name}．射程${d.range}` : d.name
+    bg = card.key === 'jail' ? '#b9b9b9' : card.key === 'dynamite' ? '#f08a6a' : d.colour === 'green' ? '#a9dc8f' : d.range ? '#f2c75c' : '#a9c9f2'
+  } else if (gold) {
+    text = GOLD_DEFS[gold].name
+    bg = '#f0d77a'
+  }
+  const tex = tagTexture(text, bg)
+  return (
+    <sprite position={[0, y, 0.05]} scale={[1.04, 0.26, 1]} renderOrder={5}>
+      <spriteMaterial map={tex} transparent depthWrite={false} />
+    </sprite>
+  )
+}
+
+const METAL = { color: '#6b7078', metalness: 0.75, roughness: 0.32 } as const
+const WOOD = { color: '#6b3e1e', roughness: 0.6 } as const
+const BRASS = { color: '#c9a03a', metalness: 0.85, roughness: 0.25 } as const
+
+/** 每種裝備的小道具（平放在牌上） */
+function GearProp({ k }: { k: string }) {
+  const range = CARD_DEFS[k as keyof typeof CARD_DEFS]?.range
+  const y = 0.05
+  if (k === 'carabine' || k === 'winchester' || k === 'shotgun') {
+    // 長槍
+    const len = k === 'winchester' ? 0.62 : k === 'shotgun' ? 0.48 : 0.56
+    return (
+      <group position={[0, y, 0.05]} rotation-y={0.25}>
+        <mesh position={[len * 0.18, 0, 0]} rotation-z={Math.PI / 2} castShadow>
+          <cylinderGeometry args={[0.018, 0.018, len * 0.75, 10]} />
+          <meshStandardMaterial {...METAL} />
+        </mesh>
+        {k === 'shotgun' && (
+          <mesh position={[len * 0.18, 0, 0.034]} rotation-z={Math.PI / 2} castShadow>
+            <cylinderGeometry args={[0.018, 0.018, len * 0.75, 10]} />
+            <meshStandardMaterial {...METAL} />
+          </mesh>
+        )}
+        <mesh position={[-len * 0.25, -0.005, 0.015]} castShadow>
+          <boxGeometry args={[0.1, 0.05, 0.06]} />
+          <meshStandardMaterial {...METAL} />
+        </mesh>
+        <mesh position={[-len * 0.45, -0.012, 0.015]} rotation-y={0.08} castShadow>
+          <boxGeometry args={[len * 0.32, 0.045, 0.08]} />
+          <meshStandardMaterial {...WOOD} />
+        </mesh>
+      </group>
+    )
+  }
+  if (range) {
+    // 手槍：越遠的射程槍管越長
+    const barrel = 0.12 + range * 0.035
+    return (
+      <group position={[0, y, 0.05]} rotation-y={0.35}>
+        <mesh position={[barrel / 2 + 0.04, 0.01, 0]} rotation-z={Math.PI / 2} castShadow>
+          <cylinderGeometry args={[0.02, 0.02, barrel, 10]} />
+          <meshStandardMaterial {...METAL} />
+        </mesh>
+        <mesh position={[0.02, 0.01, 0]} rotation-z={Math.PI / 2} castShadow>
+          <cylinderGeometry args={[0.045, 0.045, 0.07, 12]} />
+          <meshStandardMaterial {...METAL} color="#7a7f88" />
+        </mesh>
+        {k === 'volcanic' && (
+          <mesh position={[barrel / 2 + 0.04, -0.025, 0]} rotation-z={Math.PI / 2}>
+            <cylinderGeometry args={[0.014, 0.014, barrel, 8]} />
+            <meshStandardMaterial {...BRASS} />
+          </mesh>
+        )}
+        <mesh position={[-0.06, -0.005, 0.03]} rotation-y={-0.5} castShadow>
+          <boxGeometry args={[0.1, 0.035, 0.05]} />
+          <meshStandardMaterial {...WOOD} />
+        </mesh>
+      </group>
+    )
+  }
+  switch (k) {
+    case 'scope':
+    case 'binocular':
+      // 望遠鏡：一節一節的黃銅筒
+      return (
+        <group position={[0, y + 0.01, 0.05]} rotation-y={0.4}>
+          {[0, 1, 2].map((i) => (
+            <mesh key={i} position={[-0.1 + i * 0.1, 0, 0]} rotation-z={Math.PI / 2} castShadow>
+              <cylinderGeometry args={[0.04 - i * 0.008, 0.04 - i * 0.008, 0.11, 14]} />
+              <meshStandardMaterial {...BRASS} />
+            </mesh>
+          ))}
+          <mesh position={[-0.16, 0, 0]} rotation-z={Math.PI / 2}>
+            <cylinderGeometry args={[0.03, 0.03, 0.01, 14]} />
+            <meshStandardMaterial color="#9fd3ff" metalness={0.2} roughness={0.05} />
+          </mesh>
+        </group>
+      )
+    case 'barrel':
+      return (
+        <group position={[0, 0.14, 0.05]}>
+          <mesh castShadow>
+            <cylinderGeometry args={[0.12, 0.12, 0.26, 16]} />
+            <meshStandardMaterial color="#8a5a2c" roughness={0.8} />
+          </mesh>
+          {[-0.08, 0.08].map((h) => (
+            <mesh key={h} position={[0, h, 0]}>
+              <cylinderGeometry args={[0.128, 0.128, 0.025, 16]} />
+              <meshStandardMaterial color="#3a3a3a" metalness={0.6} roughness={0.4} />
+            </mesh>
+          ))}
+        </group>
+      )
+    case 'mustang':
+      // 馬蹄鐵
+      return (
+        <mesh position={[0, 0.025, 0.05]} rotation-x={-Math.PI / 2} castShadow>
+          <torusGeometry args={[0.1, 0.025, 8, 20, Math.PI * 1.3]} />
+          <meshStandardMaterial color="#8b8f96" metalness={0.8} roughness={0.35} />
+        </mesh>
+      )
+    case 'hideout':
+      return (
+        <mesh position={[0, 0.11, 0.05]} castShadow>
+          <coneGeometry args={[0.15, 0.2, 4]} />
+          <meshStandardMaterial color="#b89b6a" roughness={0.9} />
+        </mesh>
+      )
+    case 'dynamite':
+      return (
+        <group position={[0, 0.04, 0.05]} rotation-y={0.3}>
+          {[-0.04, 0, 0.04].map((z) => (
+            <mesh key={z} position={[0, 0, z]} rotation-z={Math.PI / 2} castShadow>
+              <cylinderGeometry args={[0.022, 0.022, 0.24, 10]} />
+              <meshStandardMaterial color="#c0281f" roughness={0.7} />
+            </mesh>
+          ))}
+          <mesh position={[0.15, 0.02, 0]} rotation-z={-0.6}>
+            <cylinderGeometry args={[0.004, 0.004, 0.1, 5]} />
+            <meshStandardMaterial color="#e8d7a0" emissive="#ffb040" emissiveIntensity={0.8} />
+          </mesh>
+        </group>
+      )
+    case 'jail':
+      // 小鐵欄
+      return (
+        <group position={[0, 0.06, 0.05]}>
+          {[-0.09, -0.03, 0.03, 0.09].map((x) => (
+            <mesh key={x} position={[x, 0, 0]} castShadow>
+              <cylinderGeometry args={[0.01, 0.01, 0.12, 6]} />
+              <meshStandardMaterial color="#3d3f44" metalness={0.8} roughness={0.4} />
+            </mesh>
+          ))}
+          <mesh position={[0, 0.06, 0]} rotation-z={Math.PI / 2}>
+            <cylinderGeometry args={[0.012, 0.012, 0.22, 6]} />
+            <meshStandardMaterial color="#3d3f44" metalness={0.8} roughness={0.4} />
+          </mesh>
+        </group>
+      )
+    default:
+      return null
+  }
+}
+
+/** 被關進監獄：鐵欄從天而降罩住這個人 */
+function JailCage({ theta }: { theta: number }) {
+  const g = useRef<THREE.Group>(null)
+  const born = useRef<number | null>(null)
+  const pos = polar(theta, SEAT_R, 0)
+  useFrame(({ clock }) => {
+    if (!g.current) return
+    if (born.current == null) born.current = clock.elapsedTime
+    const k = Math.min(1, (clock.elapsedTime - born.current) / 0.55)
+    // 落下後稍微彈一下
+    const drop = k < 1 ? (1 - k * k) * 3 : 0
+    g.current.position.y = drop
+  })
+  const bars = 14
+  const R = 0.78
+  const tex = tagTexture('監獄', '#b9b9b9')
+  return (
+    <group position={pos}>
+      <group ref={g}>
+        {Array.from({ length: bars }, (_, i) => {
+          const a = (i / bars) * Math.PI * 2
+          return (
+            <mesh key={i} position={[Math.sin(a) * R, 1.35, Math.cos(a) * R]} castShadow>
+              <cylinderGeometry args={[0.022, 0.022, 2.7, 8]} />
+              <meshStandardMaterial color="#2e3034" metalness={0.85} roughness={0.35} />
+            </mesh>
+          )
+        })}
+        {[0.05, 1.35, 2.7].map((h) => (
+          <mesh key={h} position={[0, h, 0]} rotation-x={Math.PI / 2}>
+            <torusGeometry args={[R, 0.035, 8, 40]} />
+            <meshStandardMaterial color="#2e3034" metalness={0.85} roughness={0.35} />
+          </mesh>
+        ))}
+        <sprite position={[0, 3.05, 0]} scale={[0.9, 0.225, 1]}>
+          <spriteMaterial map={tex} transparent depthWrite={false} />
+        </sprite>
+      </group>
     </group>
   )
 }
@@ -799,6 +1022,7 @@ function Seat({
     m.emissiveIntensity = reduced ? 1.2 : 0.9 + Math.sin(clock.elapsedTime * 4) * 0.5
   })
   const ch = p.character ? CHAR_BY_ID[p.character] : null
+  const jailed = p.alive && p.table.some((c) => c.key === 'jail')
   const winner = !!v.result?.winners.includes(p.seat)
   const marks: { text: string; cls: string }[] = []
   if (dead) marks.push({ text: '死亡', cls: 'm-dead' })
@@ -819,7 +1043,8 @@ function Seat({
           <meshStandardMaterial color={winner ? '#e9cf7f' : '#d08a3a'} emissive={winner ? '#e9cf7f' : '#d08a3a'} transparent opacity={0.85} />
         </mesh>
       )}
-      <TableRow cards={p.table} theta={theta} />
+      <TableRow cards={p.table} theta={theta} gold={p.gold} />
+      {jailed && !(me && mode === 'first') && <JailCage theta={theta} />}
       {!(me && mode === 'first') && (
         <Html
           position={me ? polar(theta, TABLE_R + 0.3, TABLE_Y + 0.1) : polar(theta, SEAT_R, 2.95)}
@@ -846,8 +1071,9 @@ export function PlateBody({ p, v, me, ch, marks }: { p: PublicPlayer; v: GameVie
         {p.isAI && <span className="seat-ai">電腦</span>}
         <span className="plate-hand">手牌 {p.handCount}</span>
       </div>
-      <div className="plate-char">
+      <div className="plate-char" onClick={() => window.dispatchEvent(new CustomEvent('bang-inspect', { detail: p.seat }))} title="點一下看角色能力與裝備">
         {ch ?? '挑選角色中'}
+        {ch && <span className="plate-info">能力</span>}
         {p.role && <span className={`role r-${p.role}`}>{ROLE_NAME[p.role]}</span>}
       </div>
       <div className="plate-hp" aria-label={`生命 ${p.hp} / ${p.maxHp}`}>

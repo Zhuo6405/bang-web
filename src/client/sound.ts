@@ -12,6 +12,8 @@ export type Sfx =
   | 'clink' // 裝備
   | 'gulp' // 喝啤酒
   | 'flip' // 抽判定
+  | 'coin' // 擲硬幣
+  | 'coinLand' // 硬幣落地
   | 'grunt' // 中彈
   | 'myTurn' // 輪到你出牌
   | 'prompt' // 需要你回應
@@ -177,6 +179,13 @@ export function play(s: Sfx) {
       break
     case 'gulp':
       ;[0, 0.14, 0.28].forEach((d) => tone(260, t + d, 0.1, { type: 'sine', vol: 0.18, slide: 1.6 }))
+      break
+    case 'coin':
+      tone(3400, t, 0.12, { type: 'triangle', vol: 0.1 })
+      tone(5100, t + 0.01, 0.25, { type: 'sine', vol: 0.06 })
+      break
+    case 'coinLand':
+      ;[0, 0.07, 0.12, 0.155].forEach((d, i) => tone(2900 - i * 150, t + d, 0.06, { type: 'triangle', vol: 0.09 - i * 0.015 }))
       break
     case 'flip':
       noise(t, 0.08, { vol: 0.3, from: 3000, to: 1500, q: 1 })

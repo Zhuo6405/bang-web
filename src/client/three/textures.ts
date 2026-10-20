@@ -126,3 +126,25 @@ export function eventTexture(name: string, text: string) {
     lines.slice(0, 8).forEach((l, i) => g.fillText(l, 180, 250 + i * 34))
   })
 }
+
+/** 桌上裝備的名牌：圓角底色 + 字，字太長會自動縮小 */
+export function tagTexture(text: string, bg: string, fg = '#1c140c') {
+  return make(`tag-${text}-${bg}-${fg}`, 512, 128, (g) => {
+    g.font = `900 72px ${SERIF}`
+    const w = Math.min(500, g.measureText(text).width + 56)
+    const size = w >= 500 ? Math.floor((72 * 444) / g.measureText(text).width) : 72
+    g.font = `900 ${size}px ${SERIF}`
+    const x = (512 - w) / 2
+    g.fillStyle = bg
+    g.strokeStyle = 'rgba(20,10,5,0.85)'
+    g.lineWidth = 6
+    g.beginPath()
+    g.roundRect(x + 3, 14, w - 6, 100, 50)
+    g.fill()
+    g.stroke()
+    g.fillStyle = fg
+    g.textAlign = 'center'
+    g.textBaseline = 'middle'
+    g.fillText(text, 256, 68)
+  })
+}

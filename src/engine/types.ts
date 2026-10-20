@@ -317,6 +317,8 @@ export interface GameState {
   /** 第一個死掉的人（死人復活事件） */
   firstDead: number | null
   deadManDone: boolean
+  /** 開局自由選角：每輪大家同時挑，撞角就擲硬幣 */
+  pick?: PickState | null
 }
 
 export type Action =
@@ -389,4 +391,22 @@ export interface LegalAbility {
   /** 可以選的牌（荷西只能棄藍牌） */
   cardIds?: number[]
   targets?: number[]
+}
+
+/** 撞角時的擲硬幣：每一輪每人擲出的硬幣（true＝人頭） */
+export interface CoinDuel {
+  char: string
+  seats: number[]
+  rounds: { seat: number; coins: boolean[] }[][]
+  winner: number
+}
+
+export interface PickState {
+  /** 這局可以選的角色（依擴充包） */
+  pool: string[]
+  /** 這一輪每個人送出的選擇（還沒定案） */
+  picks: (string | null)[]
+  round: number
+  /** 上一輪的擲硬幣結果 */
+  duels: CoinDuel[]
 }

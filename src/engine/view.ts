@@ -1,5 +1,5 @@
 import { distance, evOn, getDecisions, goldKey, legalAbilities, legalPlays, weaponRange } from './engine'
-import type { Card, Decision, Fx, GameResult, GameState, GoldKey, LegalAbility, LegalPlay, LogEntry, Role, Suit } from './types'
+import type { Card, CoinDuel, Decision, Fx, GameResult, GameState, GoldKey, LegalAbility, LegalPlay, LogEntry, Role, Suit } from './types'
 
 export interface PublicPlayer {
   seat: number
@@ -34,6 +34,8 @@ export interface GameView {
   players: PublicPlayer[]
   hand: Card[]
   myCharOptions: string[]
+  /** 選角階段：大家的選擇（公開）、已定案的角色、擲硬幣結果 */
+  pick: { pool: string[]; picks: (string | null)[]; locked: Record<string, number>; round: number; duels: CoinDuel[] } | null
   deckCount: number
   discardTop: Card | null
   store: Card[]
@@ -95,6 +97,16 @@ export function viewFor(s: GameState, me: number): GameView {
     })),
     hand: s.players[me].hand.map((id) => s.cards[id]),
     myCharOptions: s.players[me].charOptions,
+    pick:
+      s.pick
+        ? {
+            pool: s.pick.pool,
+            picks: s.pick.picks,
+            locked: Object.fromEntries(s.players.filter((p) => p.character).map((p) => [p.character!, p.seat])),
+            round: s.pick.round,
+            duels: s.pick.duels,
+          }
+        : null,
     deckCount: s.deck.length,
     discardTop: s.discard.length ? s.cards[s.discard[s.discard.length - 1]] : null,
     store: s.store.map((id) => s.cards[id]),

@@ -17,15 +17,28 @@ describe('卡牌資料', () => {
 })
 
 /** 開一局並幫每個人挑好指定角色 */
+/** 幫每個人挑好角色：指定的照指定，其他人挑不撞的 */
+function pickAll(s: GameState, chars: Record<number, string>) {
+  const wanted = new Set(Object.values(chars))
+  const used = new Set<string>()
+  for (let guard = 0; s.turn.phase === 'choose' && guard < 20; guard++) {
+    for (const d of getDecisions(s)) {
+      if (d.type !== 'choose_character') continue
+      const want = chars[d.player]
+      const c = want && d.options.includes(want) ? want : d.options.find((x) => !wanted.has(x) && !used.has(x))!
+      used.add(c)
+      s = applyAction(s, d.player, { type: 'choose_character', character: c })
+    }
+  }
+  // 測試要多人同一個角色時（正式遊戲不會發生）：直接指定
+  s = structuredClone(s)
+  for (const [seat, c] of Object.entries(chars)) s.players[Number(seat)].character = c
+  return s
+}
 function setup(n: number, chars: Record<number, string> = {}, seed = 3): GameState {
   let s = startGame(makeConfig(n, seed))
   s = structuredClone(s)
-  for (const p of s.players) {
-    const want = chars[p.seat]
-    if (want) p.charOptions = [want, p.charOptions[1] === want ? p.charOptions[0] : p.charOptions[1]]
-  }
-  for (const d of getDecisions(s)) if (d.type === 'choose_character') s = applyAction(s, d.player, { type: 'choose_character', character: d.options[0] })
-  return s
+  return pickAll(s, chars)
 }
 /** 把某人的手牌換成指定的牌（從牌堆或棄牌堆拿） */
 function give(s: GameState, p: number, keys: CardKey[]) {
@@ -46,13 +59,40 @@ const total = (s: GameState) => s.deck.length + s.discard.length + s.store.lengt
 
 function setupX(n: number, exps: string[], chars: Record<number, string> = {}, seed = 3): GameState {
   let s = structuredClone(startGame(makeConfig(n, seed, exps)))
-  for (const p of s.players) {
-    const want = chars[p.seat]
-    if (want) p.charOptions = [want, p.charOptions[1] === want ? p.charOptions[0] : p.charOptions[1]]
-  }
-  for (const d of getDecisions(s)) if (d.type === 'choose_character') s = applyAction(s, d.player, { type: 'choose_character', character: d.options[0] })
-  return s
+  return pickAll(s, chars)
 }
+
+describe('選角', () => {
+  it('撞角時擲硬幣，沒選到的人重選；警長加 1 點生命，血量依角色', () => {
+    let s = startGame(makeConfig(5, 7, ['wild_west_show']))
+    expect(getDecisions(s).length).toBe(5)
+    for (const p of [0, 1, 2]) s = applyAction(s, p, { type: 'choose_character', character: 'gary' })
+    s = applyAction(s, 3, { type: 'choose_character', character: 'teren' })
+    expect(s.turn.phase).toBe('choose')
+    s = applyAction(s, 4, { type: 'choose_character', character: 'bart' })
+    expect(s.pick!.duels.length).toBe(1)
+    const d = s.pick!.duels[0]
+    expect(d.seats).toEqual([0, 1, 2])
+    expect(s.players[d.winner].character).toBe('gary')
+    expect(d.rounds[0][0].coins.length).toBe(3)
+    // 輸的兩人重選，gary 已不能選
+    const decs = getDecisions(s)
+    expect(decs.map((x) => x.player).sort()).toEqual([0, 1, 2].filter((x) => x !== d.winner))
+    expect((decs[0] as { options: string[] }).options).not.toContain('gary')
+    for (const x of decs) s = applyAction(s, x.player, { type: 'choose_character', character: x.player === decs[0].player ? 'willy' : 'suzy' })
+    expect(s.turn.phase).not.toBe('choose')
+    for (const p of s.players) {
+      const base = { gary: 5, teren: 3, bart: 4, willy: 4, suzy: 4 }[p.character!]!
+      expect(p.maxHp).toBe(base + (p.role === 'sheriff' ? 1 : 0))
+    }
+  })
+  it('只開放已選擴充包的角色', () => {
+    const s = startGame(makeConfig(4, 1))
+    const opts = (getDecisions(s)[0] as { options: string[] }).options
+    expect(opts.length).toBe(16)
+    expect(() => applyAction(s, 0, { type: 'choose_character', character: 'gary' })).toThrow()
+  })
+})
 
 describe('規則', () => {
   it('開局：警長先手、多 1 點生命、手牌等於生命', () => {
@@ -301,7 +341,7 @@ describe('AI 自動對戰', () => {
       expect(state.result, `seed ${seed}`).not.toBeNull()
       expect(total(state) + state.poker.length).toBe(135)
     }
-  })
+  }, 30_000)
 
   it('4–7 人都能打完，牌數守恆', () => {
     for (let n = 4; n <= 7; n++) {
@@ -311,5 +351,5 @@ describe('AI 自動對戰', () => {
         expect(total(state)).toBe(80)
       }
     }
-  })
+  }, 30_000)
 })

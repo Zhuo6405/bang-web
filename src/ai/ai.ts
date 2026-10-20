@@ -144,7 +144,11 @@ export function decide(v: GameView): Action {
   const d = v.decision
   if (!d) return { type: 'end_turn' }
   if (d.type === 'choose_character') {
-    const best = [...d.options].sort((a, b) => (CHAR_PREF[b] ?? 5) - (CHAR_PREF[a] ?? 5))[0]
+    // 避開別人已經選的，在比較好用的幾個角色裡隨機挑一個
+    const others = new Set(v.pick?.picks.filter(Boolean) ?? [])
+    const free = d.options.filter((c) => !others.has(c))
+    const list = (free.length ? free : d.options).map((c) => ({ c, w: (CHAR_PREF[c] ?? 5) + Math.random() * 3 }))
+    const best = list.sort((a, b) => b.w - a.w)[0].c
     return { type: 'choose_character', character: best }
   }
   if (d.type === 'ask') return answer(v, d.ask)
