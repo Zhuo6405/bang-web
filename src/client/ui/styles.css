@@ -2636,3 +2636,9 @@ button:disabled {
   color: #ffe9c0;
   max-width: 220px;
 }
+
+/* 3D 場景與名牌的共同容器 */
+.scene-host {
+  position: absolute;
+  inset: 0;
+}

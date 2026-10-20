@@ -1,7 +1,9 @@
+import type React from 'react'
 import { Html, OrbitControls } from '@react-three/drei'
 import { Canvas, useFrame, useThree, type ThreeElements } from '@react-three/fiber'
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import * as THREE from 'three'
+import { clampedPosition, keepVisible } from './plateClamp'
 import { CARD_DEFS, CHAR_BY_ID, EVENT_BY_ID, GOLD_DEFS, ROLE_NAME } from '../../engine/data'
 import type { Card, Fx } from '../../engine/types'
 import type { GameView, PublicPlayer } from '../../engine/view'
@@ -25,6 +27,9 @@ function seatAngle(seat: number, me: number, n: number) {
 const polar = (theta: number, r: number, y: number) => new THREE.Vector3(r * Math.sin(theta), y, r * Math.cos(theta))
 
 export type ViewMode = 'first' | 'overview'
+
+/** 名牌固定放進這個容器：避免 drei 在事件連線後換容器、把名牌內容弄丟 */
+const PlateHost = createContext<RefObject<HTMLDivElement | null> | null>(null)
 
 // ───────── 特效排程：把引擎的 fx 轉成動畫事件 ─────────
 
@@ -140,10 +145,15 @@ export function TableScene(props: SceneProps) {
       setFontsReady((x) => x + 1)
     })
   }, [])
+  const host = useRef<HTMLDivElement>(null)
   return (
-    <Canvas shadows dpr={[1, 2]} camera={{ position: [0, 6.4, 8.2], fov: 44 }} gl={{ antialias: true }} key={fontsReady}>
-      <Inner {...props} />
-    </Canvas>
+    <div ref={host} className="scene-host">
+      <PlateHost.Provider value={host}>
+        <Canvas shadows dpr={[1, 2]} camera={{ position: [0, 6.4, 8.2], fov: 44 }} gl={{ antialias: true }} key={fontsReady}>
+          <Inner {...props} />
+        </Canvas>
+      </PlateHost.Provider>
+    </div>
   )
 }
 
@@ -679,6 +689,7 @@ function Seat({
   reduced: boolean
   mode: ViewMode
 }) {
+  const plateHost = useContext(PlateHost)
   const me = p.seat === v.me
   const pos = polar(theta, SEAT_R, 0)
   const dead = !p.alive
@@ -714,6 +725,9 @@ function Seat({
         <Html
           position={me ? polar(theta, TABLE_R + 0.3, TABLE_Y + 0.1) : polar(theta, SEAT_R, 2.95)}
           center
+          calculatePosition={mode === 'first' ? clampedPosition : undefined}
+          portal={(plateHost ?? undefined) as React.RefObject<HTMLElement> | undefined}
+          onOcclude={keepVisible}
           className={`plate ${me ? 'is-me' : ''} ${acting ? 'is-acting' : ''} ${dead ? 'is-out' : ''} ${winner ? 'is-winner' : ''}`}
           zIndexRange={[20, 0]}
         >
