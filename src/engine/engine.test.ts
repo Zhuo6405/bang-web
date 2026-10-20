@@ -71,6 +71,7 @@ describe('選角', () => {
     expect(s.turn.phase).toBe('choose')
     s = applyAction(s, 4, { type: 'choose_character', character: 'bart' })
     expect(s.pick!.duels.length).toBe(1)
+    expect(s.pick!.duels[0].round).toBe(1)
     const d = s.pick!.duels[0]
     expect(d.seats).toEqual([0, 1, 2])
     expect(s.players[d.winner].character).toBe('gary')

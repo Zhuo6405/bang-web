@@ -346,7 +346,7 @@ function coinDuel(s: GameState, char: string, seats: number[]): CoinDuel {
     left = top
   }
   const winner = left.length === 1 ? left[0] : left[Math.floor(rand(s) * left.length)]
-  return { char, seats, rounds, winner }
+  return { round: s.pick!.round, char, seats, rounds, winner }
 }
 
 function resolvePicks(s: GameState) {
@@ -356,7 +356,6 @@ function resolvePicks(s: GameState) {
     const c = pk.picks[seat]
     if (!p.character && c) by.set(c, [...(by.get(c) ?? []), seat])
   })
-  pk.duels = []
   for (const [char, seats] of by) {
     const name = CHAR_BY_ID[char].name
     if (seats.length === 1) {

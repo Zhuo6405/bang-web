@@ -3004,7 +3004,7 @@ button:disabled {
   position: relative;
   transform-style: preserve-3d;
   transform: rotateY(0deg);
-  animation: coin-flip 1.1s cubic-bezier(0.25, 0.7, 0.3, 1) forwards;
+  animation: coin-flip 1.4s cubic-bezier(0.2, 0.6, 0.3, 1) both;
 }
 
 .coin-face {
@@ -3033,10 +3033,14 @@ button:disabled {
 
 @keyframes coin-flip {
   0% {
+    visibility: hidden;
     transform: translateY(0) rotateY(0deg);
   }
+  2% {
+    visibility: visible;
+  }
   40% {
-    transform: translateY(-26px) rotateY(calc(var(--end) * 0.5));
+    transform: translateY(-34px) rotateY(calc(var(--end) * 0.55));
   }
   100% {
     transform: translateY(0) rotateY(var(--end));
@@ -3246,4 +3250,108 @@ button:disabled {
   margin: 0;
   min-height: 40px;
   min-width: 44px;
+}
+
+/* 擲硬幣：慢慢揭曉 */
+.duel-one {
+  opacity: 0;
+  animation: duel-in 0.3s forwards;
+}
+
+.duel-no {
+  margin: 4px 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+.duel-row {
+  border-radius: 6px;
+  padding: 4px 8px;
+  transition: background 0.3s;
+}
+
+.duel-count {
+  min-width: 4.5em;
+  font-weight: 700;
+  opacity: 0;
+  animation: duel-in 0.25s forwards;
+}
+
+.duel-res {
+  margin-left: auto;
+  font-weight: 900;
+  opacity: 0;
+  animation: duel-in 0.3s forwards;
+  animation-delay: var(--res-at);
+}
+
+.duel-row.is-win {
+  animation: duel-win-row 0.4s forwards;
+  animation-delay: var(--res-at);
+}
+
+.duel-row.is-win .duel-res {
+  color: #2f7a2a;
+}
+
+.duel-row.is-lose {
+  animation: duel-lose-row 0.4s forwards;
+  animation-delay: var(--res-at);
+}
+
+.duel-row.is-lose .duel-res {
+  color: var(--ink-soft);
+}
+
+@keyframes duel-win-row {
+  to {
+    background: rgba(111, 174, 92, 0.28);
+    box-shadow: 0 0 0 2px #6fae5c;
+  }
+}
+
+@keyframes duel-lose-row {
+  to {
+    opacity: 0.55;
+  }
+}
+
+.duel-note {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.duel-win {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(176, 40, 31, 0.08);
+}
+
+.duel-win small {
+  font-family: var(--sans);
+  font-weight: 400;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.duel > button {
+  align-self: center;
+  min-width: 200px;
+  min-height: 44px;
+  border-radius: 6px;
+  font-weight: 700;
+  border: 1px solid var(--ink-soft);
+  background: transparent;
+  color: var(--ink-soft);
+}
+
+.duel > button.primary {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
 }

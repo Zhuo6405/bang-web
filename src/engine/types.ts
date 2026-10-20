@@ -395,6 +395,8 @@ export interface LegalAbility {
 
 /** 撞角時的擲硬幣：每一輪每人擲出的硬幣（true＝人頭） */
 export interface CoinDuel {
+  /** 第幾輪選角發生的 */
+  round: number
   char: string
   seats: number[]
   rounds: { seat: number; coins: boolean[] }[][]
@@ -407,6 +409,6 @@ export interface PickState {
   /** 這一輪每個人送出的選擇（還沒定案） */
   picks: (string | null)[]
   round: number
-  /** 上一輪的擲硬幣結果 */
+  /** 所有擲硬幣結果（依輪次累積） */
   duels: CoinDuel[]
 }

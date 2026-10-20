@@ -54,17 +54,14 @@ export function GameScreen({
   useEffect(() => {
     if (v.result) recordResult(v, social ? 'online' : 'local', historyId)
   }, [v, social, historyId])
-  if (v.phase === 'choose' && v.pick) {
-    return (
-      <>
-        <CharacterPick v={v} act={ctl.act} deadline={ctl.deadline} />
-        <DuelOverlay v={v} />
-      </>
-    )
-  }
+  // 擲硬幣視窗放在固定位置：從選角畫面切到牌桌時不會被重置
   return (
     <>
-      <Table ctl={ctl} social={social} onExit={onExit} exitLabel={exitLabel} resultActions={resultActions} topExtra={topExtra} />
+      {v.phase === 'choose' && v.pick ? (
+        <CharacterPick v={v} act={ctl.act} deadline={ctl.deadline} />
+      ) : (
+        <Table ctl={ctl} social={social} onExit={onExit} exitLabel={exitLabel} resultActions={resultActions} topExtra={topExtra} />
+      )}
       <DuelOverlay v={v} />
     </>
   )

@@ -155,101 +155,173 @@ export function CharacterPick({ v, act, deadline }: { v: GameView; act: (a: Acti
   )
 }
 
-const FLIP = 1.1 // 一輪硬幣翻轉的秒數
-const GAP = 0.5
+/** 擲硬幣的時間軸（秒）：一個人擲完再換下一個，每輪結束停一下，最後公布誰拿到 */
+const COIN = 1.4 // 一枚硬幣翻轉落地
+const PER = 1.7 // 下一個人開始擲的間隔
+const COIN_GAP = 0.25 // 同一人多枚硬幣的間隔
+const NOTE = 0.3 // 這一輪擲完後多久顯示結果
+const HOLD = 1.8 // 顯示結果後停多久才進下一輪
+const WIN_HOLD = 1.5 // 公布後停留
 
-/** 撞角時的擲硬幣動畫：選角畫面和牌桌都會顯示一次 */
+interface Step {
+  /** 每個人開始擲的時間 */
+  flips: { seat: number; coins: boolean[]; at: number }[]
+  note: number
+}
+interface Timeline {
+  rounds: Step[]
+  win: number
+  end: number
+}
+
+function timeline(d: CoinDuel, start: number): Timeline {
+  let t = start
+  const rounds: Step[] = []
+  for (const round of d.rounds) {
+    const flips = round.map((f) => {
+      const at = t
+      t += PER + (f.coins.length - 1) * COIN_GAP
+      return { ...f, at }
+    })
+    const note = t - PER + COIN + NOTE
+    rounds.push({ flips, note })
+    t = note + HOLD
+  }
+  return { rounds, win: t - HOLD + 0.6, end: t - HOLD + 0.6 + WIN_HOLD }
+}
+
+/** 撞角時的擲硬幣動畫：選角畫面和牌桌都會顯示一次，看完按「繼續」才關 */
 export function DuelOverlay({ v }: { v: GameView }) {
   const pk = v.pick
-  const key = pk && pk.duels.length ? `${pk.round}` : null
-  const [shown, setShown] = useState<string | null>(null)
-  const seen = useRef(new Set<string>())
+  // 中途重新整理進來的話，之前的擲硬幣就不再重播
+  const seen = useRef(v.phase === 'choose' ? 0 : Number.POSITIVE_INFINITY)
+  const [duels, setDuels] = useState<CoinDuel[] | null>(null)
+  const [done, setDone] = useState(false)
+  const latest = pk?.duels.length ? Math.max(...pk.duels.map((d) => d.round)) : 0
   useEffect(() => {
-    if (key && !seen.current.has(key)) {
-      seen.current.add(key)
-      setShown(key)
-    }
-  }, [key])
-  const duels = shown && pk && shown === key ? pk.duels : null
-  const total = duels ? Math.max(...duels.map((d) => d.rounds.length)) * (FLIP + GAP) : 0
+    if (duels || !pk || latest <= seen.current) return
+    const fresh = pk.duels.filter((d) => d.round > seen.current)
+    seen.current = latest
+    setDone(false)
+    setDuels(fresh)
+  }, [latest, duels, pk])
+  const close = () => setDuels(null)
+  const shown = duels
+  // 多組撞角依序播放
+  const lines = useMemo(() => {
+    if (!duels) return []
+    let t = 0.6
+    return duels.map((d) => {
+      const tl = timeline(d, t)
+      t = tl.end + 0.8
+      return tl
+    })
+  }, [duels])
+  const total = lines.length ? lines[lines.length - 1].end : 0
   useEffect(() => {
     if (!duels) return
     const timers: ReturnType<typeof setTimeout>[] = []
-    const rounds = Math.max(...duels.map((d) => d.rounds.length))
-    for (let r = 0; r < rounds; r++) {
-      timers.push(setTimeout(() => play('coin'), r * (FLIP + GAP) * 1000))
-      timers.push(setTimeout(() => play('coinLand'), (r * (FLIP + GAP) + FLIP) * 1000))
-    }
-    timers.push(setTimeout(() => setShown(null), (total + 4) * 1000))
+    for (const tl of lines)
+      for (const r of tl.rounds)
+        for (const f of r.flips)
+          f.coins.forEach((_, i) => {
+            const at = f.at + i * COIN_GAP
+            timers.push(setTimeout(() => play('coin'), at * 1000))
+            timers.push(setTimeout(() => play('coinLand'), (at + COIN) * 1000))
+          })
+    timers.push(setTimeout(() => setDone(true), total * 1000))
     return () => timers.forEach(clearTimeout)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shown])
   if (!duels) return null
   return (
-    <div className="duel-backdrop" role="dialog" aria-label="擲硬幣決定角色" onClick={() => setShown(null)}>
-      <div className="duel" onClick={(e) => e.stopPropagation()}>
-        <h2>撞角了！擲硬幣</h2>
-        {duels.map((d) => (
-          <Duel key={d.char} d={d} v={v} />
+    <div className="duel-backdrop" role="dialog" aria-label="擲硬幣決定角色">
+      <div className="duel">
+        <h2>撞角了！擲硬幣決定</h2>
+        {duels.map((d, i) => (
+          <Duel key={`${d.round}-${d.char}`} d={d} v={v} tl={lines[i]} />
         ))}
-        <button type="button" className="primary" onClick={() => setShown(null)}>
-          繼續
+        <button type="button" className={done ? 'primary' : 'ghost'} onClick={close}>
+          {done ? '知道了，繼續' : '跳過動畫'}
         </button>
       </div>
     </div>
   )
 }
 
-function Duel({ d, v }: { d: CoinDuel; v: GameView }) {
+function Duel({ d, v, tl }: { d: CoinDuel; v: GameView; tl: Timeline }) {
   const name = CHAR_BY_ID[d.char].name
-  const end = d.rounds.length * (FLIP + GAP)
+  const who = (s: number) => (s === v.me ? '你' : v.players[s].name)
   return (
-    <section className="duel-one">
-      <h3>【{name}】{d.seats.map((s) => v.players[s].name).join(' vs ')}</h3>
+    <section className="duel-one" style={{ animationDelay: `${tl.rounds[0].flips[0].at - 0.5}s` }}>
+      <h3>
+        【{name}】{d.seats.map(who).join(' vs ')}
+      </h3>
       {d.rounds.map((round, r) => {
+        const step = tl.rounds[r]
         const heads = round.map((f) => f.coins.filter(Boolean).length)
         const best = Math.max(...heads)
         const top = round.filter((_, i) => heads[i] === best)
         const single = round[0].coins.length === 1
         const note = single
           ? top.length === 1
-            ? `${v.players[top[0].seat].name} 擲出人頭`
+            ? `${who(top[0].seat)} 擲出人頭！`
             : best
-              ? '都是人頭，重擲'
-              : '都是反面，重擲'
+              ? '兩個都是人頭，重擲'
+              : '兩個都是反面，重擲'
           : top.length === 1
-            ? `${v.players[top[0].seat].name} 人頭最多（${best} 個）`
-            : `${top.map((f) => v.players[f.seat].name).join('、')} 平手，再擲`
-        const delay = r * (FLIP + GAP)
+            ? `${who(top[0].seat)} 人頭最多（${best} 個）！`
+            : `${top.map((f) => who(f.seat)).join('、')} 平手（${best} 個人頭），再擲`
         return (
-          <div key={r} className="duel-round" style={{ animationDelay: `${delay}s` }}>
-            {round.map((f) => (
-              <div key={f.seat} className="duel-row">
-                <span className="duel-who">{f.seat === v.me ? '你' : v.players[f.seat].name}</span>
-                <span className="coins">
-                  {f.coins.map((h, i) => (
-                    <span
-                      key={i}
-                      className="coin"
-                      style={{ animationDelay: `${delay + i * 0.08}s`, ['--end' as string]: h ? '1800deg' : '1980deg' }}
-                      aria-label={h ? '人頭' : '反面'}
-                    >
-                      <span className="coin-face heads">人頭</span>
-                      <span className="coin-face tails">反面</span>
-                    </span>
-                  ))}
-                </span>
-              </div>
-            ))}
-            <p className="duel-note" style={{ animationDelay: `${delay + FLIP}s` }}>
+          <div key={r} className="duel-round" style={{ animationDelay: `${step.flips[0].at - 0.3}s` }}>
+            {d.rounds.length > 1 && <p className="duel-no">第 {r + 1} 次</p>}
+            {step.flips.map((f, j) => {
+              const h = heads[j]
+              const last = r === d.rounds.length - 1
+              const res = last ? (f.seat === d.winner ? 'is-win' : 'is-lose') : ''
+              return (
+                <div key={f.seat} className={`duel-row ${res}`} style={{ ['--res-at' as string]: `${tl.win}s` }}>
+                  <span className="duel-who">{who(f.seat)}</span>
+                  <span className="coins">
+                    {f.coins.map((c, i) => (
+                      <span
+                        key={i}
+                        className="coin"
+                        style={{ animationDelay: `${f.at + i * COIN_GAP}s`, ['--end' as string]: c ? '2160deg' : '2340deg' }}
+                        aria-label={c ? '人頭' : '反面'}
+                      >
+                        <span className="coin-face heads">人頭</span>
+                        <span className="coin-face tails">反面</span>
+                      </span>
+                    ))}
+                  </span>
+                  <span className="duel-count" style={{ animationDelay: `${f.at + (f.coins.length - 1) * COIN_GAP + COIN}s` }}>
+                    {f.coins.length > 1 ? `${h} 個人頭` : h ? '人頭' : '反面'}
+                  </span>
+                  {last && <span className="duel-res">{f.seat === d.winner ? '拿到了！' : '沒選到'}</span>}
+                </div>
+              )
+            })}
+            <p className="duel-note" style={{ animationDelay: `${step.note}s` }}>
               {note}
             </p>
           </div>
         )
       })}
-      <p className="duel-win" style={{ animationDelay: `${end}s` }}>
-        {d.winner === v.me ? '你' : v.players[d.winner].name} 拿到【{name}】
-      </p>
+      <div className="duel-win" style={{ animationDelay: `${tl.win}s` }}>
+        <span>
+          <b>{who(d.winner)}</b> 拿到【{name}】
+        </span>
+        {d.seats.filter((s) => s !== d.winner).length > 0 && (
+          <small>
+            {d.seats
+              .filter((s) => s !== d.winner)
+              .map(who)
+              .join('、')}
+            沒選到，要從剩下的角色重選
+          </small>
+        )}
+      </div>
     </section>
   )
 }
