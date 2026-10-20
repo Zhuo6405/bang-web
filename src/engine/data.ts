@@ -1,4 +1,4 @@
-import type { Card, CardColour, CardKey, Role, Suit } from './types'
+import type { Card, CardColour, CardKey, GoldKey, Role, Suit } from './types'
 
 export interface CardDef {
   key: CardKey
@@ -59,6 +59,50 @@ export const CARD_DEFS: Record<CardKey, CardDef> = {
   buffalo: { key: 'buffalo', name: '野牛步槍', colour: 'green', desc: '綠牌：棄掉，對任一玩家開一槍（不限距離）。' },
   howitzer: { key: 'howitzer', name: '榴彈砲', colour: 'green', desc: '綠牌：棄掉，當作「格林機槍」。' },
   pony: { key: 'pony', name: '驛馬快遞', colour: 'green', desc: '綠牌：棄掉，抽 3 張牌。' },
+  // 幽谷
+  ghostcard: { key: 'ghostcard', name: '幽靈', colour: 'blue', desc: '放在一名已死亡的玩家面前：他以幽靈身分回到遊戲，不會受傷也不會回血。牌被拿走他就再次離場。' },
+  lemat: { key: 'lemat', name: '勒馬特', colour: 'blue', range: 1, desc: '射程 1。自己回合中任何手牌都可以當作「砰！」。' },
+  rattlesnake: { key: 'rattlesnake', name: '響尾蛇', colour: 'blue', desc: '放在任一玩家面前：他回合開始時抽判定，黑桃就失去 1 點生命。' },
+  shotgun: { key: 'shotgun', name: '霰彈槍', colour: 'blue', range: 1, desc: '射程 1。你每讓一名玩家受傷，他就要棄 1 張手牌。' },
+  bounty: { key: 'bounty', name: '懸賞', colour: 'blue', desc: '放在任一玩家面前：有人用「砰！」打中他，開槍的人抽 1 張。' },
+  lastcall: { key: 'lastcall', name: '最後一杯', colour: 'brown', desc: '回 1 點生命（只剩兩人時也有效）。' },
+  tomahawk: { key: 'tomahawk', name: '印第安戰斧', colour: 'brown', desc: '攻擊距離 2 以內的一名玩家（要「射偏了！」才躲得掉）。' },
+  tornado: { key: 'tornado', name: '龍捲風', colour: 'brown', desc: '每個人（包括你）棄 1 張手牌，再抽 2 張。' },
+  fanning: { key: 'fanning', name: '連開', colour: 'brown', desc: '算這回合的「砰！」：對目標開一槍，再對目標距離 1 的另一人開一槍。' },
+  aim: { key: 'aim', name: '瞄準', colour: 'brown', cost: true, desc: '和一張「砰！」一起打出：打中的話對方失去 2 點生命。' },
+  bandidos: { key: 'bandidos', name: '土匪', colour: 'brown', desc: '其他每個人選擇棄 2 張手牌（只有 1 張就棄 1 張），或失去 1 點生命。' },
+  escape: { key: 'escape', name: '逃脫', colour: 'brown', desc: '回合外打出：躲開一張以你為目標的棕牌效果（「砰！」除外）。' },
+  poker: { key: 'poker', name: '撲克', colour: 'brown', desc: '其他每個人棄 1 張手牌；如果裡面沒有 A，你拿走其中最多 2 張。' },
+  backfire: { key: 'backfire', name: '回火', colour: 'brown', desc: '當作「射偏了！」，並對開槍的人開一槍。' },
+}
+
+export interface GoldDef {
+  key: GoldKey
+  name: string
+  cost: number
+  /** brown = 買了立刻使用；black = 放在面前 */
+  kind: 'brown' | 'black'
+  desc: string
+  copies: number
+}
+
+/** 淘金熱 24 張裝備 */
+export const GOLD_DEFS: Record<GoldKey, GoldDef> = {
+  shotglass: { key: 'shotglass', name: '小酒杯', cost: 1, kind: 'brown', copies: 3, desc: '任一玩家（可以是自己）回 1 點生命。' },
+  bottle: { key: 'bottle', name: '酒瓶', cost: 2, kind: 'brown', copies: 3, desc: '當作「搶奪」、「啤酒」或「砰！」使用（不算次數）。' },
+  pardner: { key: 'pardner', name: '搭檔', cost: 2, kind: 'brown', copies: 3, desc: '當作「雜貨店」、「決鬥」或「卡特巴洛」使用。' },
+  goldrushcard: { key: 'goldrushcard', name: '淘金熱', cost: 5, kind: 'brown', copies: 1, desc: '這回合立刻結束，回滿生命，再玩一回合。' },
+  rum: { key: 'rum', name: '蘭姆酒', cost: 3, kind: 'brown', copies: 2, desc: '抽判定 4 張，每有一種不同花色回 1 點生命。' },
+  unionpacific: { key: 'unionpacific', name: '聯合太平洋', cost: 4, kind: 'brown', copies: 1, desc: '從牌堆抽 4 張。' },
+  calumet: { key: 'calumet', name: '和平菸斗', cost: 3, kind: 'black', copies: 1, desc: '別人打出的方塊牌對你無效（決鬥除外）。' },
+  gunbelt: { key: 'gunbelt', name: '子彈帶', cost: 2, kind: 'black', copies: 1, desc: '回合結束時手牌最多可以留 8 張。' },
+  horseshoe: { key: 'horseshoe', name: '馬蹄鐵', cost: 2, kind: 'black', copies: 1, desc: '抽判定時翻 2 張，挑有利的一張。' },
+  pickaxe: { key: 'pickaxe', name: '十字鎬', cost: 4, kind: 'black', copies: 1, desc: '抽牌階段多抽 1 張。' },
+  wanted: { key: 'wanted', name: '通緝令', cost: 2, kind: 'black', copies: 3, desc: '放在另一名玩家面前：殺死他的人抽 2 張並得到 1 金塊。' },
+  goldpan: { key: 'goldpan', name: '淘金盤', cost: 3, kind: 'black', copies: 1, desc: '自己回合中付 1 金塊抽 1 張，每回合最多 2 次。' },
+  boots: { key: 'boots', name: '靴子', cost: 3, kind: 'black', copies: 1, desc: '每失去 1 點生命就抽 1 張（最後 1 點不算）。' },
+  luckycharm: { key: 'luckycharm', name: '幸運符', cost: 3, kind: 'black', copies: 1, desc: '每失去 1 點生命就得到 1 金塊（最後 1 點不算）。' },
+  rucksack: { key: 'rucksack', name: '背包', cost: 3, kind: 'black', copies: 1, desc: '付 2 金塊回 1 點生命（瀕死時也可以）。' },
 }
 
 export const isWeapon = (k: CardKey) => CARD_DEFS[k].range != null
@@ -105,10 +149,17 @@ const DODGE: [CardKey, Suit, number | string][] = [
   ['buffalo', 'C', 'Q'], ['pony', 'D', 'Q'], ['pepperbox', 'H', 'A'], ['howitzer', 'S', 9],
 ]
 
+/** 幽谷 15 張（「得救」需要即時打斷，暫不收錄） */
+const VALLEY: [CardKey, Suit, number | string][] = [
+  ['ghostcard', 'S', 9], ['ghostcard', 'S', 10], ['lemat', 'D', 4], ['rattlesnake', 'H', 7], ['shotgun', 'S', 'K'], ['bounty', 'C', 9],
+  ['lastcall', 'D', 8], ['tomahawk', 'D', 'A'], ['fanning', 'S', 2], ['bandidos', 'D', 'Q'], ['escape', 'H', 3], ['aim', 'C', 6],
+  ['poker', 'H', 'J'], ['backfire', 'C', 'Q'], ['tornado', 'C', 'A'],
+]
+
 const RANKS: Record<string, number> = { J: 11, Q: 12, K: 13, A: 14 }
 
 export function buildCards(expansions: string[] = []): Card[] {
-  const list = [...BASE, ...(expansions.includes('dodge_city') ? DODGE : [])]
+  const list = [...BASE, ...(expansions.includes('dodge_city') ? DODGE : []), ...(expansions.includes('valley_of_shadows') ? VALLEY : [])]
   return list.map(([key, suit, r], id) => ({ id, key, suit, rank: typeof r === 'number' ? r : RANKS[r] }))
 }
 
@@ -159,6 +210,33 @@ export const CHARACTERS: CharDef[] = [
   { id: 'pat', name: '派特．布瑞南', hp: 4, set: 'dodge_city', text: '抽牌階段可以改成拿走任一玩家場上的一張牌。' },
   { id: 'jose', name: '荷西．德爾加多', hp: 4, set: 'dodge_city', text: '自己回合中可以棄 1 張藍牌抽 2 張，每回合最多 2 次。' },
   { id: 'doc', name: '霍利戴醫生', hp: 4, set: 'dodge_city', text: '每回合一次，棄 2 張手牌，對射程內一人開一槍（不算次數）。' },
+  // 淘金熱
+  { id: 'donbell', name: '唐．貝爾', hp: 4, set: 'gold_rush', text: '回合結束時抽判定：紅心或方塊就再玩一回合（額外回合後不再判定）。' },
+  { id: 'dutch', name: '荷蘭佬威爾', hp: 4, set: 'gold_rush', text: '抽牌階段抽 2 張，留 1 張棄 1 張，並得到 1 金塊。' },
+  { id: 'jacky', name: '傑基．穆列塔', hp: 4, set: 'gold_rush', text: '自己回合中付 2 金塊，就能不用牌再開一槍（射程內）。' },
+  { id: 'josh', name: '喬許．麥克勞德', hp: 4, set: 'gold_rush', text: '自己回合中付 2 金塊，抽裝備牌堆最上面一張。' },
+  { id: 'yto', name: '伊托夫人', hp: 4, set: 'gold_rush', text: '任何人打出啤酒時，她抽 1 張。' },
+  { id: 'luzena', name: '美人露瑟娜', hp: 4, set: 'gold_rush', text: '每回合買一張裝備可以便宜 1 金塊。' },
+  { id: 'raddie', name: '雷迪．史奈克', hp: 4, set: 'gold_rush', text: '自己回合中付 1 金塊抽 1 張，每回合最多 2 次。' },
+  { id: 'simeon', name: '西蒙．皮可斯', hp: 4, set: 'gold_rush', text: '每失去 1 點生命就得到 1 金塊。' },
+  // 幽谷
+  { id: 'blackflower', name: '黑花', hp: 4, set: 'valley_of_shadows', text: '每回合一次，可以把一張梅花牌當作額外的「砰！」。' },
+  { id: 'colorado', name: '科羅拉多比爾', hp: 4, set: 'valley_of_shadows', text: '打出「砰！」時抽判定：黑桃就躲不掉。' },
+  { id: 'ringer', name: '德史波特．林格', hp: 4, set: 'valley_of_shadows', text: '每回合一次，可以把「砰！」當作「格林機槍」。' },
+  { id: 'evelyn', name: '伊芙琳．薛邦', hp: 4, set: 'valley_of_shadows', text: '抽牌階段每少抽 1 張，就對射程內一名不同的玩家開一槍。' },
+  { id: 'henry', name: '亨利．布洛克', hp: 4, set: 'valley_of_shadows', text: '誰拿走或棄掉他的牌（手牌或場上），就挨他一槍。' },
+  { id: 'lemonade', name: '檸檬水吉姆', hp: 4, set: 'valley_of_shadows', text: '別人喝啤酒時，他可以棄 1 張手牌也回 1 點生命。' },
+  { id: 'mick', name: '米克．迪芬德', hp: 4, set: 'valley_of_shadows', text: '被棕牌（「砰！」以外）當作目標時，可以用「射偏了！」躲開。' },
+  { id: 'tuco', name: '圖科．法蘭奇斯卡納', hp: 4, set: 'valley_of_shadows', text: '場上沒有藍牌時，抽牌階段多抽 2 張。' },
+  // 西部秀
+  { id: 'bigspencer', name: '大斯賓瑟', hp: 9, set: 'wild_west_show', text: '開局只拿 5 張手牌。不能打出「射偏了！」。' },
+  { id: 'flint', name: '佛林特．威斯伍德', hp: 4, set: 'wild_west_show', text: '每回合一次，拿 1 張手牌換另一名玩家隨機 2 張手牌。' },
+  { id: 'gary', name: '蓋瑞．路特', hp: 5, set: 'wild_west_show', text: '別人回合結束時棄掉的多餘手牌都歸他。' },
+  { id: 'greygory', name: '葛雷戈里．戴克', hp: 4, set: 'wild_west_show', text: '回合開始時隨機抽 2 個角色，得到他們的能力直到下一回合。' },
+  { id: 'johnpain', name: '約翰．佩恩', hp: 4, set: 'wild_west_show', text: '手牌少於 6 張時，任何人抽判定翻出的牌都歸他。' },
+  { id: 'lee', name: '李．范．克利夫', hp: 4, set: 'wild_west_show', text: '自己回合中可以棄 1 張「砰！」，重複剛才打出的棕牌效果。' },
+  { id: 'teren', name: '泰倫．基爾', hp: 3, set: 'wild_west_show', text: '要死亡時抽判定：不是黑桃就留在 1 點生命並抽 1 張。' },
+  { id: 'youl', name: '尤爾．葛林納', hp: 4, set: 'wild_west_show', text: '回合開始時，手牌比他多的人都要給他 1 張牌。' },
 ]
 export const CHAR_BY_ID: Record<string, CharDef> = Object.fromEntries(CHARACTERS.map((c) => [c.id, c]))
 
@@ -187,7 +265,7 @@ export const maxPlayersFor = (expansions: string[]) => (expansions.includes('dod
 export interface EventDef {
   id: string
   name: string
-  set: 'high_noon' | 'fistful'
+  set: 'high_noon' | 'fistful' | 'wild_west_show'
   text: string
   /** 最後一張（放在事件牌堆底） */
   final?: boolean
@@ -226,6 +304,14 @@ export const EVENTS: EventDef[] = [
   { id: 'roulette', name: '俄羅斯輪盤', set: 'fistful', text: '翻開時從警長開始輪流棄「射偏了！」，第一個棄不出的人失去 2 點生命。' },
   { id: 'vendetta', name: '復仇', set: 'fistful', text: '回合結束時抽判定：紅心就再玩一回合（只能一次）。' },
   { id: 'fistful', name: '一把卡牌', set: 'fistful', final: true, text: '回合開始時，手上有幾張牌就挨幾槍。' },
+  // 西部秀（封口、桃樂絲、德州玫瑰夫人暫不收錄）
+  { id: 'boneorchard', name: '墓園', set: 'wild_west_show', text: '翻開時，所有死去的玩家帶著 1 點生命回來，身份從死者之間重新隨機分配。' },
+  { id: 'darling', name: '親愛的瓦倫丁', set: 'wild_west_show', text: '回合開始時，棄掉全部手牌，再抽同樣張數。' },
+  { id: 'helena', name: '海倫娜．宗特羅', set: 'wild_west_show', text: '翻開時抽判定：紅心或方塊，就把警長以外活著的人的身份重新洗牌分配。' },
+  { id: 'susanna', name: '蘇珊娜小姐', set: 'wild_west_show', text: '每回合至少要打出 3 張牌，不然失去 1 點生命。' },
+  { id: 'showdown', name: '對決', set: 'wild_west_show', text: '任何牌都可以當作「砰！」，「砰！」也可以當作「射偏了！」。' },
+  { id: 'sacagaway', name: '薩卡加維亞', set: 'wild_west_show', text: '所有人的手牌都公開。' },
+  { id: 'wildwestshow', name: '西部秀', set: 'wild_west_show', final: true, text: '所有人的目標都變成：成為最後一個活著的人！' },
 ]
 export const EVENT_BY_ID: Record<string, EventDef> = Object.fromEntries(EVENTS.map((e) => [e.id, e]))
 
@@ -236,8 +322,8 @@ export const EXPANSIONS: { id: string; name: string; ready: boolean }[] = [
   { id: 'dodge_city', name: '道奇城', ready: true },
   { id: 'high_noon', name: '正午', ready: true },
   { id: 'fistful', name: '一把卡牌', ready: true },
-  { id: 'wild_west_show', name: '西部秀', ready: false },
-  { id: 'gold_rush', name: '淘金熱', ready: false },
-  { id: 'valley_of_shadows', name: '幽谷', ready: false },
+  { id: 'wild_west_show', name: '西部秀', ready: true },
+  { id: 'gold_rush', name: '淘金熱', ready: true },
+  { id: 'valley_of_shadows', name: '幽谷', ready: true },
   { id: 'armed_dangerous', name: '全副武裝', ready: false },
 ]

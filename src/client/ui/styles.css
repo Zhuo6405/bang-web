@@ -2538,3 +2538,101 @@ button:disabled {
   outline: 3px solid #e0b85a;
   box-shadow: 0 0 18px rgba(224, 184, 90, 0.8);
 }
+
+/* 淘金熱 */
+.gold-info {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  align-items: center;
+  margin-left: 6px;
+}
+.nugget {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffd75a;
+}
+.nugget::before {
+  content: '';
+  width: 11px;
+  height: 9px;
+  border-radius: 40% 55% 45% 50%;
+  background: radial-gradient(circle at 35% 35%, #fff2a8, #e0a820 60%, #8a5a10);
+}
+.gear.g-gold {
+  background: #1f1a14;
+  border: 1px solid #c9a227;
+  color: #ffe08a;
+}
+.shop {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: stretch;
+  margin: 6px 0;
+  padding: 8px;
+  border: 1px dashed #8a6a2a;
+  border-radius: 8px;
+  background: rgba(60, 40, 10, 0.35);
+}
+.shop-title {
+  width: 100%;
+  font-weight: 700;
+  color: #ffd75a;
+}
+.shop-title small {
+  margin-left: 8px;
+  font-weight: 400;
+  color: var(--text-soft);
+}
+.shop-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 8px;
+  text-align: left;
+  min-width: 150px;
+  max-width: 220px;
+  padding: 6px 10px;
+  background: #2a1f14;
+  border: 2px solid #5a4a2a;
+  color: var(--text);
+}
+.shop-item.k-black {
+  border-color: #1a1a1a;
+  box-shadow: inset 0 0 0 2px #c9a227;
+}
+.shop-item.k-brown {
+  border-color: #7a4a22;
+}
+.shop-item.on {
+  outline: 3px solid var(--brass);
+}
+.shop-item:disabled {
+  opacity: 0.5;
+}
+.shop-item .price {
+  color: #ffd75a;
+  font-weight: 700;
+}
+.shop-item small {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: var(--text-soft);
+  line-height: 1.4;
+}
+.shop .choices {
+  width: 100%;
+}
+.shop-drops {
+  width: 100%;
+  font-size: 14px;
+}
+.plate-open {
+  margin-top: 3px;
+  font-size: 12px;
+  color: #ffe9c0;
+  max-width: 220px;
+}

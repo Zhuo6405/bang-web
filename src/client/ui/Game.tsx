@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { CARD_DEFS, CHAR_BY_ID, EVENT_BY_ID, ROLE_GOAL, ROLE_NAME, SUIT_NAME, SUIT_SYMBOL } from '../../engine/data'
-import type { Action, AskView, Card, GameConfig, LegalAbility, LegalPlay, PlayAs } from '../../engine/types'
+import { CARD_DEFS, CHAR_BY_ID, EVENT_BY_ID, GOLD_DEFS, ROLE_GOAL, ROLE_NAME, SUIT_NAME, SUIT_SYMBOL } from '../../engine/data'
+import { playName as enginePlayName } from '../../engine/engine'
+import type { Action, AskView, Card, GameConfig, GoldKey, LegalAbility, LegalPlay, PlayAs } from '../../engine/types'
 import type { GameView } from '../../engine/view'
 import { CardFace, RoleBadge } from './components'
 import { useLocalController, useSecondsLeft, type GameController, type Social } from './controller'
@@ -12,7 +13,7 @@ import { useGameSounds, useSoundOn } from './useGameSounds'
 // 3D 場景比較大，進牌桌時才載入
 const TableScene = lazy(() => import('../three/TableScene').then((m) => ({ default: m.TableScene })))
 
-const playName = (as: PlayAs) => (as === 'sniper' ? '狙擊' : as === 'ricochet' ? '跳彈' : CARD_DEFS[as].name)
+const playName = (as: PlayAs) => enginePlayName(as)
 
 export function LocalGame({ config, onExit }: { config: GameConfig; onExit: () => void }) {
   const ctl = useLocalController(config)
@@ -122,6 +123,7 @@ function Table({
   const v = ctl.view
   const [sel, setSel] = useState<number | null>(null)
   const [picked, setPicked] = useState<number[]>([])
+  const [selShop, setSelShop] = useState<number | null>(null)
   const [ability, setAbility] = useState<LegalAbility | null>(null)
   const [costFor, setCostFor] = useState<{ legal: LegalPlay; target?: number; targetCard?: number | 'hand' } | null>(null)
   const [tab, setTab] = useState<'log' | 'chat'>('log')
@@ -161,6 +163,7 @@ function Table({
 
   const clear = () => {
     setSel(null)
+    setSelShop(null)
     setPicked([])
     setAbility(null)
     setCostFor(null)
@@ -182,7 +185,7 @@ function Table({
     const l = costFor.legal
     const ids = v.hand.filter((c) => c.id !== l.card && (!l.costKind || c.key === 'bang' || (c.key === 'missed' && me.character === 'calamity'))).map((c) => c.id)
     pick = { ids, min: l.cost!, max: l.cost! }
-  } else if (ask && ask.zone === 'hand' && (ask.kind === 'discard' || ask.kind === 'ranch')) pick = { ids: ask.cards, min: ask.min, max: ask.max }
+  } else if (ask && ask.zone === 'hand' && (ask.kind === 'discard' || ask.kind === 'ranch' || ask.kind === 'bandidos')) pick = { ids: ask.cards, min: ask.min, max: ask.max }
   const quickPick = !pick && ask && ask.zone === 'hand' && ask.max === 1
 
   const clickCard = (c: Card) => {
@@ -282,6 +285,8 @@ function Table({
           ctl={ctl}
           selCard={selCard}
           setSel={setSel}
+          selShop={selShop}
+          setSelShop={setSelShop}
           legal={selCard ? (legalById.get(selCard.id) ?? []) : []}
           picked={picked}
           setPicked={setPicked}
@@ -369,6 +374,7 @@ function MyStatus({ v }: { v: GameView }) {
           </span>
         )}
         {me.table.length > 0 && <Gear cards={me.table} fresh={v.fresh} />}
+        {v.goldOn && <GoldInfo n={me.nuggets} items={me.gold} />}
       </div>
     </div>
   )
@@ -404,9 +410,10 @@ function Roster({ v }: { v: GameView }) {
               {p.ghost ? '幽靈' : p.alive ? `♥ ${p.hp}/${p.maxHp}` : '已死亡'}
               {p.alive && p.seat !== v.me && v.players[v.me].alive && <span className={`plate-dist ${p.dist <= v.myRange ? 'in-range' : ''}`}>距 {p.dist}</span>}
             </span>
-            {p.table.length > 0 && (
+            {(p.table.length > 0 || v.goldOn) && (
               <span className="r-gear">
                 <Gear cards={p.table} fresh={v.fresh} />
+                {v.goldOn && <GoldInfo n={p.nuggets} items={p.gold} />}
               </span>
             )}
           </li>
@@ -430,6 +437,8 @@ function Prompt({
   ctl,
   selCard,
   setSel,
+  selShop,
+  setSelShop,
   legal,
   picked,
   setPicked,
@@ -443,6 +452,8 @@ function Prompt({
   ctl: GameController
   selCard: Card | null
   setSel: (id: number | null) => void
+  selShop: number | null
+  setSelShop: (id: number | null) => void
   legal: LegalPlay[]
   picked: number[]
   setPicked: (p: number[]) => void
@@ -550,13 +561,14 @@ function Prompt({
           </div>
         </div>
       )}
+      {d?.type === 'play' && v.goldOn && <ShopPanel v={v} selShop={selShop} setSelShop={(id) => { setSel(null); setSelShop(id) }} act={act} onCost={() => {}} />}
       {mine && (
         <div className="choices">
           {d?.type === 'play' && tableCards.length > 0 && (
             <span className="choice-group">
               <span className="choice-label">場上的綠牌</span>
               {tableCards.map((c) => (
-                <button key={c.id} type="button" className={`gear-btn ${selCard?.id === c.id ? 'on' : ''}`} onClick={() => setSel(selCard?.id === c.id ? null : c.id)}>
+                <button key={c.id} type="button" className={`gear-btn ${selCard?.id === c.id ? 'on' : ''}`} onClick={() => { setSelShop(null); setSel(selCard?.id === c.id ? null : c.id) }}>
                   {CARD_DEFS[c.key].name}
                 </button>
               ))}
@@ -615,19 +627,52 @@ function PlayOptions({
   onCost: (target?: number, targetCard?: number | 'hand') => void
 }) {
   const [target, setTarget] = useState<number | null>(null)
+  const [first, setFirst] = useState<number | null>(null)
   const me = v.players[v.me]
-  const card = (legal.source === 'table' ? me.table : v.hand).find((c) => c.id === legal.card)!
   const name = playName(legal.as)
-  const colour = CARD_DEFS[card.key].colour
-  const label =
-    legal.source === 'table'
-      ? `使用場上的【${name}】`
-      : card.key !== legal.as
-        ? `把【${CARD_DEFS[card.key].name}】當作【${name}】`
-        : colour !== 'brown'
-          ? `${colour === 'green' ? '放到場上' : '裝備'}【${name}】`
-          : `使用【${name}】`
-  const go = (t?: number, tc?: number | 'hand') => (legal.cost ? onCost(t, tc) : onPlay({ type: 'play', card: legal.card, as: legal.as, target: t, targetCard: tc }))
+  let label: string
+  if (legal.source === 'shop') {
+    const item = [...v.shop, ...(v.myFree ? [v.myFree] : []), ...v.players.flatMap((p) => p.gold)].find((x) => x.uid === legal.card)
+    const gname = item ? GOLD_DEFS[item.key].name : ''
+    label =
+      legal.as === 'golddrop'
+        ? `付 ${legal.price} 金塊棄掉【${gname}】`
+        : `${legal.price ? `花 ${legal.price} 金塊` : '免費'}${item && item.key !== legal.as ? `用【${gname}】當作【${name}】` : `買【${gname}】`}`
+  } else {
+    const card = (legal.source === 'table' ? me.table : v.hand).find((c) => c.id === legal.card)!
+    const colour = CARD_DEFS[card.key].colour
+    label =
+      legal.source === 'table'
+        ? `使用場上的【${name}】`
+        : card.key !== legal.as
+          ? `把【${CARD_DEFS[card.key].name}】當作【${name}】`
+          : colour !== 'brown'
+            ? `${colour === 'green' ? '放到場上' : '裝備'}【${name}】`
+            : `使用【${name}】`
+  }
+  const go = (t?: number, tc?: number | 'hand', t2?: number) => (legal.cost ? onCost(t, tc) : onPlay({ type: 'play', card: legal.card, as: legal.as, target: t, targetCard: tc, target2: t2 }))
+  // 連開：選完第一個目標，再選他旁邊的第二個
+  if (legal.second && first != null) {
+    const opts = legal.second[first] ?? []
+    return (
+      <span className="choice-group">
+        <span className="choice-label">【連開】第二個目標（{v.players[first].name} 旁邊的人）</span>
+        {opts.map((q) => (
+          <button key={q} type="button" className="primary" onClick={() => go(first, undefined, q)}>
+            {v.players[q].name}
+          </button>
+        ))}
+        {!opts.length && (
+          <button type="button" className="primary" onClick={() => go(first)}>
+            只打 {v.players[first].name}
+          </button>
+        )}
+        <button type="button" onClick={() => setFirst(null)}>
+          換人
+        </button>
+      </span>
+    )
+  }
   if (!legal.targets) {
     return (
       <button type="button" className="primary" onClick={() => go()}>
@@ -668,9 +713,9 @@ function PlayOptions({
       {legal.targets.map((q) => {
         const p = v.players[q]
         return (
-          <button key={q} type="button" className="primary" onClick={() => (legal.pickCard ? setTarget(q) : go(q))}>
+          <button key={q} type="button" className="primary" onClick={() => (legal.pickCard ? setTarget(q) : legal.second ? setFirst(q) : go(q))}>
             {q === v.me ? '自己' : p.name}
-            <small>{q === v.me ? `♥${p.hp}` : `距離 ${p.dist}．♥${p.hp}`}</small>
+            <small>{!p.alive ? '已死亡' : q === v.me ? `♥${p.hp}` : `距離 ${p.dist}．♥${p.hp}`}</small>
           </button>
         )
       })}
@@ -681,6 +726,7 @@ function PlayOptions({
 const TARGET_LABEL: Partial<Record<AskView['kind'], (name: string, n: number) => string>> = {
   jesse: (name, n) => `從 ${name} 手上拿（${n} 張）`,
   vera: (name) => `複製 ${name}`,
+  evelyn: (name) => `對 ${name} 開槍`,
   blood: (name) => `給 ${name} 1 點生命`,
 }
 
@@ -701,7 +747,13 @@ function AskPanel({ v, ask, picked, setPicked, act }: { v: GameView; ask: AskVie
         </button>
       ))}
       {ask.options.map((o) => (
-        <button key={o.id} type="button" className={o.primary ? 'primary' : ''} onClick={() => act({ type: 'answer', opt: o.id, cards: ask.kind === 'ranch' ? picked : undefined })}>
+        <button
+          key={o.id}
+          type="button"
+          className={o.primary ? 'primary' : ''}
+          disabled={ask.kind === 'bandidos' && o.id === 'ok' && picked.length !== ask.min}
+          onClick={() => act({ type: 'answer', opt: o.id, cards: ask.kind === 'ranch' || ask.kind === 'bandidos' ? picked : undefined })}
+        >
           {o.label}
         </button>
       ))}
@@ -718,15 +770,15 @@ function AskPanel({ v, ask, picked, setPicked, act }: { v: GameView; ask: AskVie
     )
   }
   if (ask.zone === 'reveal') {
-    const multi = ask.min > 1
+    const multi = ask.max > 1
     return (
       <div className="choices reveal">
         {ask.shown.map((c) => (
           <CardFace key={c.id} card={c} usable selected={picked.includes(c.id)} onClick={() => (multi ? toggle(c.id) : act({ type: 'answer', cards: [c.id] }))} />
         ))}
         {multi ? (
-          <button type="button" className="primary" disabled={picked.length !== ask.min} onClick={() => act({ type: 'answer', opt: 'ok', cards: picked })}>
-            拿這 {ask.min} 張
+          <button type="button" className="primary" disabled={picked.length < ask.min || picked.length > ask.max} onClick={() => act({ type: 'answer', opt: 'ok', cards: picked })}>
+            {ask.min === ask.max ? `拿這 ${ask.min} 張` : `拿走選取的 ${picked.length} 張`}
           </button>
         ) : (
           ask.options.map((o) => (
@@ -748,10 +800,12 @@ function AskPanel({ v, ask, picked, setPicked, act }: { v: GameView; ask: AskVie
       </div>
     )
   }
-  if (ask.kind === 'ranch') {
+  if (ask.kind === 'ranch' || ask.kind === 'bandidos') {
     return (
       <div className="choices">
-        <span className="choice-label">點選下方要換掉的手牌（已選 {picked.length} 張）</span>
+        <span className="choice-label">
+          {ask.kind === 'ranch' ? '點選下方要換掉的手牌' : `點選下方 ${ask.min} 張要棄的手牌`}（已選 {picked.length} 張）
+        </span>
         {buttons}
       </div>
     )
@@ -813,6 +867,71 @@ function Result({ v, actions }: { v: GameView; actions: ReactNode }) {
         </table>
         <div className="result-actions">{actions}</div>
       </div>
+    </div>
+  )
+}
+
+export function GoldInfo({ n, items }: { n: number; items: { uid: number; key: GoldKey }[] }) {
+  return (
+    <span className="gold-info">
+      <span className="nugget" title="金塊">
+        {n}
+      </span>
+      {items.map((x) => (
+        <span key={x.uid} className="gear g-gold" title={GOLD_DEFS[x.key].desc}>
+          {GOLD_DEFS[x.key].name}
+        </span>
+      ))}
+    </span>
+  )
+}
+
+/** 淘金熱商店：三張翻開的裝備、喬許抽到的免費裝備、棄掉別人的裝備 */
+function ShopPanel({ v, selShop, setSelShop, act }: { v: GameView; selShop: number | null; setSelShop: (id: number | null) => void; act: (a: Action) => void; onCost: () => void }) {
+  const items = [...v.shop.map((x) => ({ ...x, free: false })), ...(v.myFree ? [{ ...v.myFree, free: true }] : [])]
+  const plays = v.legal.filter((l) => l.source === 'shop')
+  const drops = plays.filter((l) => l.as === 'golddrop')
+  const chosen = selShop != null ? plays.filter((l) => l.card === selShop && l.as !== 'golddrop') : []
+  return (
+    <div className="shop">
+      <span className="shop-title">
+        商店<small>你有 {v.myNuggets} 金塊．裝備牌堆 {v.goldDeck} 張</small>
+      </span>
+      {items.map((x) => {
+        const def = GOLD_DEFS[x.key]
+        const can = plays.some((l) => l.card === x.uid && l.as !== 'golddrop')
+        return (
+          <button
+            key={x.uid}
+            type="button"
+            className={`shop-item k-${def.kind} ${selShop === x.uid ? 'on' : ''}`}
+            disabled={!can}
+            title={def.desc}
+            onClick={() => setSelShop(selShop === x.uid ? null : x.uid)}
+          >
+            <b>{def.name}</b>
+            <span className="price">{x.free ? '免費' : `${def.cost} 金`}</span>
+            <small>{def.desc}</small>
+          </button>
+        )
+      })}
+      {chosen.length > 0 && (
+        <div className="choices">
+          {chosen.map((l) => (
+            <PlayOptions key={l.as} legal={l} v={v} onPlay={act} onCost={() => {}} />
+          ))}
+        </div>
+      )}
+      {drops.length > 0 && (
+        <details className="shop-drops">
+          <summary>付金塊棄掉別人的裝備</summary>
+          <div className="choices">
+            {drops.map((l) => (
+              <PlayOptions key={l.card} legal={l} v={v} onPlay={act} onCost={() => {}} />
+            ))}
+          </div>
+        </details>
+      )}
     </div>
   )
 }

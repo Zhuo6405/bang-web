@@ -1,5 +1,5 @@
-import { distance, getDecisions, legalAbilities, legalPlays, weaponRange } from './engine'
-import type { Card, Decision, Fx, GameResult, GameState, LegalAbility, LegalPlay, LogEntry, Role, Suit } from './types'
+import { distance, evOn, getDecisions, goldKey, legalAbilities, legalPlays, weaponRange } from './engine'
+import type { Card, Decision, Fx, GameResult, GameState, GoldKey, LegalAbility, LegalPlay, LogEntry, Role, Suit } from './types'
 
 export interface PublicPlayer {
   seat: number
@@ -17,6 +17,11 @@ export interface PublicPlayer {
   dist: number
   rep: number
   ghost: boolean
+  nuggets: number
+  /** 淘金熱的黑框裝備 */
+  gold: { uid: number; key: GoldKey }[]
+  /** 薩卡加維亞事件：手牌公開 */
+  openHand: Card[] | null
 }
 
 export interface GameView {
@@ -47,6 +52,13 @@ export interface GameView {
   dir: 1 | -1
   /** 還不能用的綠牌（這回合才放上場） */
   fresh: number[]
+  /** 淘金熱 */
+  goldOn: boolean
+  shop: { uid: number; key: GoldKey }[]
+  goldDeck: number
+  myNuggets: number
+  /** 喬許抽到、可以免費使用的裝備 */
+  myFree: { uid: number; key: GoldKey } | null
   log: LogEntry[]
   fx: Fx[]
   result: GameResult | null
@@ -77,6 +89,9 @@ export function viewFor(s: GameState, me: number): GameView {
       dist: p.seat === me || !p.alive || !s.players[me].alive || s.turn.phase === 'choose' ? 0 : distance(s, me, p.seat),
       rep: s.rep[p.seat],
       ghost: !!p.ghost,
+      nuggets: s.gold?.nuggets[p.seat] ?? 0,
+      gold: (s.gold?.equip[p.seat] ?? []).map((uid) => ({ uid, key: goldKey(s, uid) })),
+      openHand: evOn(s, 'sacagaway') && p.seat !== me ? p.hand.map((id) => s.cards[id]) : null,
     })),
     hand: s.players[me].hand.map((id) => s.cards[id]),
     myCharOptions: s.players[me].charOptions,
@@ -95,6 +110,11 @@ export function viewFor(s: GameState, me: number): GameView {
     fresh: Object.entries(s.greenAt)
       .filter(([, t]) => t === s.turn.no)
       .map(([id]) => Number(id)),
+    goldOn: !!s.gold,
+    shop: (s.gold?.shop ?? []).map((uid) => ({ uid, key: goldKey(s, uid) })),
+    goldDeck: s.gold?.deck.length ?? 0,
+    myNuggets: s.gold?.nuggets[me] ?? 0,
+    myFree: s.gold?.free[me] != null ? { uid: s.gold.free[me]!, key: goldKey(s, s.gold.free[me]!) } : null,
     log: s.log.slice(-120),
     fx: s.fx,
     result: s.result,

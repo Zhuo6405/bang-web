@@ -49,6 +49,20 @@ const BASE_VALUE: Partial<Record<CardKey, number>> = {
   buffalo: 3.5,
   howitzer: 4,
   pony: 4.5,
+  ghostcard: 2,
+  lemat: 3,
+  rattlesnake: 2.5,
+  shotgun: 3,
+  bounty: 2,
+  lastcall: 3.5,
+  tomahawk: 3.5,
+  tornado: 2.5,
+  fanning: 4,
+  aim: 3.5,
+  bandidos: 3,
+  escape: 4,
+  poker: 2.5,
+  backfire: 5,
 }
 
 const CHAR_PREF: Record<string, number> = {
@@ -56,6 +70,9 @@ const CHAR_PREF: Record<string, number> = {
   paul: 5, rose: 6, jesse: 6, pedro: 5, suzy: 5, vulture: 6, gringo: 5,
   pixie: 8, elena: 8, bill: 6, tequilajoe: 6, greg: 6, herb: 6, molly: 7, apache: 6, sean: 5, belle: 6,
   vera: 6, chuck: 7, pat: 6, jose: 6, doc: 7,
+  donbell: 7, dutch: 5, jacky: 6, josh: 5, yto: 5, luzena: 5, raddie: 6, simeon: 6,
+  blackflower: 7, colorado: 7, ringer: 6, evelyn: 6, henry: 6, lemonade: 5, mick: 6, tuco: 7,
+  bigspencer: 6, flint: 6, gary: 6, greygory: 6, johnpain: 6, lee: 5, teren: 6, youl: 6,
 }
 
 const rnd = Math.random
@@ -87,6 +104,8 @@ function hostility(v: GameView, q: PublicPlayer): number {
   // 拖太久就越來越好戰，避免僵局
   const urgency = Math.min(3, v.turnNo / 30)
   if (q.seat === v.me) return -99
+  // 西部秀結局：人人都是敵人
+  if (v.event === 'wildwestshow') return 5 - q.hp * 0.1
   const outlawsLeft = remaining(v, 'outlaw')
   const renegadesLeft = remaining(v, 'renegade')
   switch (role) {
@@ -164,6 +183,7 @@ function answer(v: GameView, a: AskView): Action {
     }
     case 'dying':
       if (a.cards.length) return { type: 'answer', cards: [a.cards[0]] }
+      if (v.abilities.some((x) => x.id === 'rucksack')) return { type: 'ability', ability: 'rucksack' }
       if (v.abilities.some((x) => x.id === 'sid')) return { type: 'ability', ability: 'sid', cards: cheapest(v.hand.map((c) => c.id), 2) }
       return { type: 'answer', opt: 'die' }
     case 'discard':
@@ -224,13 +244,41 @@ function answer(v: GameView, a: AskView): Action {
       const junk = v.hand.filter((c) => value(v, c) < 2.6).map((c) => c.id)
       return { type: 'answer', opt: 'ok', cards: junk }
     }
+    case 'dutch': {
+      const best = [...a.shown].sort((x, y) => value(v, y) - value(v, x))[0]
+      return { type: 'answer', cards: [best.id] }
+    }
+    case 'evelyn': {
+      const t = enemies(v, a.targets)[0]
+      return t && rnd() < 0.7 ? { type: 'answer', target: t.seat } : { type: 'answer', opt: 'draw' }
+    }
+    case 'bandidos': {
+      const junk = [...v.hand].sort((x, y) => value(v, x) - value(v, y)).slice(0, a.min)
+      if (a.min && (me.hp <= 2 || junk.every((c) => value(v, c) < 3.5))) return { type: 'answer', opt: 'ok', cards: junk.map((c) => c.id) }
+      if (a.options.some((o) => o.id === 'escape')) return { type: 'answer', opt: 'escape' }
+      if (a.options.some((o) => o.id === 'mick')) return { type: 'answer', opt: 'mick' }
+      return me.hp >= 3 || !a.min ? { type: 'answer', opt: 'take' } : { type: 'answer', opt: 'ok', cards: junk.map((c) => c.id) }
+    }
+    case 'poker':
+    case 'tornado':
+    case 'youl':
+      return { type: 'answer', cards: cheapest(a.cards, 1) }
+    case 'pokertake': {
+      const best = [...a.shown].sort((x, y) => value(v, y) - value(v, x)).slice(0, a.max)
+      return { type: 'answer', opt: 'ok', cards: best.map((c) => c.id) }
+    }
+    case 'lemonade': {
+      const junk = v.hand.filter((c) => value(v, c) < 3).sort((x, y) => value(v, x) - value(v, y))[0]
+      return junk ? { type: 'answer', cards: [junk.id] } : { type: 'answer', opt: 'skip' }
+    }
   }
+  return { type: 'answer', opt: 'take' }
 }
 
 const PRIORITY: CardKey[] = [
   'wellsfargo', 'stagecoach', 'pony',
   'barrel', 'mustang', 'hideout', 'scope', 'binocular',
-  'winchester', 'carabine', 'remington', 'schofield', 'volcanic',
+  'winchester', 'carabine', 'remington', 'schofield', 'volcanic', 'shotgun', 'lemat',
   'bible', 'hat', 'ironplate', 'sombrero', 'knife', 'derringer', 'canteen', 'cancan', 'conestoga', 'pepperbox', 'buffalo', 'howitzer',
   'beer', 'store',
 ]
@@ -238,7 +286,7 @@ const PRIORITY: CardKey[] = [
 function playTurn(v: GameView): Action {
   const me = v.players[v.me]
   const legal = v.legal
-  const byAs = (k: string) => legal.filter((l) => l.as === k)
+  const byAs = (k: string) => legal.filter((l) => l.as === k && l.source !== 'shop')
   const cardOf = (l: LegalPlay) => (l.source === 'table' ? me.table : v.hand).find((c) => c.id === l.card)!
   const others = v.players.filter((p) => p.alive && p.seat !== v.me)
   const foes = enemies(v, others.map((p) => p.seat))
@@ -266,6 +314,19 @@ function playTurn(v: GameView): Action {
       const junk = v.hand.filter((c) => ab.cardIds!.includes(c.id) && value(v, c) < 2)
       if (junk.length) return { type: 'ability', ability: 'jose', cards: [junk[0].id] }
     }
+    if (ab.id === 'rucksack' && me.maxHp - me.hp >= 2) return { type: 'ability', ability: 'rucksack' }
+    if (ab.id === 'jacky') {
+      const t = enemies(v, ab.targets!)[0]
+      if (t) return { type: 'ability', ability: 'jacky', target: t.seat }
+    }
+    if ((ab.id === 'raddie' || ab.id === 'goldpan') && v.hand.length <= 3 && v.myNuggets >= 3) return { type: 'ability', ability: ab.id }
+    if (ab.id === 'josh' && v.myNuggets >= 4 && rnd() < 0.5) return { type: 'ability', ability: 'josh' }
+    if (ab.id === 'flint') {
+      const t = enemies(v, ab.targets!).find((p) => p.handCount >= 3)
+      const give = [...v.hand].sort((a, b) => value(v, a) - value(v, b))[0]
+      if (t && give && value(v, give) < 3) return { type: 'ability', ability: 'flint', cards: [give.id], target: t.seat }
+    }
+    if (ab.id === 'lee' && ab.cardIds!.length >= 2 && rnd() < 0.5) return { type: 'ability', ability: 'lee', cards: [ab.cardIds![0]] }
     if (ab.id === 'doc' && v.hand.length >= 4) {
       const t = enemies(v, ab.targets!)[0]
       if (t) {
@@ -275,12 +336,59 @@ function playTurn(v: GameView): Action {
     }
   }
 
+  // 淘金熱商店：先買有用的
+  for (const l of legal.filter((x) => x.source === 'shop')) {
+    const key = l.as
+    if (key === 'golddrop') continue
+    if (['pickaxe', 'horseshoe', 'boots', 'luckycharm', 'rucksack', 'gunbelt', 'calumet', 'goldpan'].includes(key) && rnd() < 0.8) return play(v, l)
+    if (key === 'unionpacific') return play(v, l)
+    if (key === 'goldrushcard' && me.hp <= me.maxHp - 2) return play(v, l)
+    if (key === 'rum' && me.maxHp - me.hp >= 2) return play(v, l)
+    if (key === 'shotglass') {
+      const t = l.targets!.map((q) => v.players[q]).filter((p) => hostility(v, p) < 0 || p.seat === v.me).sort((a, b) => a.hp - b.hp)[0]
+      if (t) return play(v, l, t.seat)
+    }
+    if ((key === 'wanted' || key === 'bang' || key === 'duel') && l.targets) {
+      const t = enemies(v, l.targets)[0]
+      if (t) return play(v, l, t.seat)
+    }
+    if ((key === 'catbalou' || key === 'panic') && l.targets) {
+      const t = enemies(v, l.targets)[0]
+      if (t) return play(v, l, t.seat, pickTargetCard(t, false))
+    }
+  }
+  for (const l of byAs('nugget')) if (!hurt) return play(v, l)
+
+  // 幽谷
+  for (const l of byAs('lastcall')) if (hurt) return play(v, l)
+  for (const k of ['rattlesnake', 'bounty'] as const)
+    for (const l of byAs(k)) {
+      const t = enemies(v, l.targets!)[0]
+      if (t) return play(v, l, t.seat)
+    }
+  for (const l of byAs('ghostcard')) {
+    const f = l.targets!.find((q) => v.players[q].role && hostility(v, v.players[q]) < 0)
+    if (f != null) return play(v, l, f)
+  }
+  for (const k of ['tomahawk', 'flower', 'aim'] as const)
+    for (const l of byAs(k)) {
+      const t = enemies(v, l.targets!)[0]
+      if (t) return play(v, l, t.seat)
+    }
+  for (const l of byAs('fanning')) {
+    const t = enemies(v, l.targets!)[0]
+    if (t) {
+      const second = [...(l.second?.[t.seat] ?? [])].sort((a, b) => hostility(v, v.players[b]) - hostility(v, v.players[a]))[0]
+      return { ...(play(v, l, t.seat) as Extract<Action, { type: 'play' }>), target2: second }
+    }
+  }
+
   for (const k of PRIORITY) {
     for (const l of byAs(k)) {
       const def = CARD_DEFS[k]
       if (def.range) {
         const bangs = v.hand.filter((x) => x.key === 'bang').length
-        if (k === 'volcanic' ? v.myRange <= 1 && bangs >= 2 : def.range > v.myRange) return play(v, l)
+        if (k === 'volcanic' ? v.myRange <= 1 && bangs >= 2 : k === 'shotgun' || k === 'lemat' ? v.myRange <= 1 && !me.table.some((c) => CARD_DEFS[c.key].range) : def.range > v.myRange) return play(v, l)
         continue
       }
       if ((k === 'beer' || k === 'canteen') && !hurt) continue
@@ -319,7 +427,8 @@ function playTurn(v: GameView): Action {
 
   const foeCount = foes.length
   const friendCount = friends.length
-  for (const k of ['indians', 'gatling', 'brawl'] as const) for (const l of byAs(k)) if (foeCount >= friendCount) return play(v, l)
+  for (const k of ['indians', 'gatling', 'brawl', 'bandidos', 'poker'] as const) for (const l of byAs(k)) if (foeCount >= friendCount && l.source !== 'shop') return play(v, l)
+  for (const l of byAs('tornado')) if (v.hand.length <= 2) return play(v, l)
 
   const myBangs = v.hand.filter((c) => c.key === 'bang' || (me.character === 'calamity' && c.key === 'missed')).length
   for (const l of byAs('duel')) {

@@ -192,7 +192,7 @@ export function Lobby({
         </section>
       )}
 
-      <footer className="lobby-foot">基本版、道奇城（8 人局）、正午、一把卡牌已實裝，其他擴充陸續開放。</footer>
+      <footer className="lobby-foot">基本版與道奇城、正午、一把卡牌、淘金熱、幽谷、西部秀已實裝；全副武裝製作中。</footer>
     </main>
   )
 }

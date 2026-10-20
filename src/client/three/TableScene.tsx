@@ -2,7 +2,7 @@ import { Html, OrbitControls } from '@react-three/drei'
 import { Canvas, useFrame, useThree, type ThreeElements } from '@react-three/fiber'
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
-import { CARD_DEFS, CHAR_BY_ID, EVENT_BY_ID, ROLE_NAME } from '../../engine/data'
+import { CARD_DEFS, CHAR_BY_ID, EVENT_BY_ID, GOLD_DEFS, ROLE_NAME } from '../../engine/data'
 import type { Card, Fx } from '../../engine/types'
 import type { GameView, PublicPlayer } from '../../engine/view'
 import { cardBackTexture, cardTexture, clearTextures, eventTexture, wordTexture } from './textures'
@@ -750,6 +750,21 @@ export function PlateBody({ p, v, me, ch, marks }: { p: PublicPlayer; v: GameVie
               {CARD_DEFS[c.key].name}
             </span>
           ))}
+        </div>
+      )}
+      {(v.goldOn || p.gold.length > 0) && (
+        <div className="plate-gear">
+          <span className="nugget">{p.nuggets}</span>
+          {p.gold.map((x) => (
+            <span key={x.uid} className="gear g-gold" title={GOLD_DEFS[x.key].desc}>
+              {GOLD_DEFS[x.key].name}
+            </span>
+          ))}
+        </div>
+      )}
+      {p.openHand && (
+        <div className="plate-open" title="薩卡加維亞：手牌公開">
+          {p.openHand.map((c) => CARD_DEFS[c.key].name).join('、') || '沒有手牌'}
         </div>
       )}
       {marks.length > 0 && (

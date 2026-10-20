@@ -52,6 +52,56 @@ export type CardKey =
   | 'buffalo'
   | 'howitzer'
   | 'pony'
+  // 幽谷
+  | 'ghostcard'
+  | 'lemat'
+  | 'rattlesnake'
+  | 'shotgun'
+  | 'bounty'
+  | 'lastcall'
+  | 'tomahawk'
+  | 'tornado'
+  | 'fanning'
+  | 'aim'
+  | 'bandidos'
+  | 'escape'
+  | 'poker'
+  | 'backfire'
+
+/** 淘金熱的裝備（另一副牌，用金塊買） */
+export type GoldKey =
+  | 'shotglass'
+  | 'bottle'
+  | 'pardner'
+  | 'goldrushcard'
+  | 'rum'
+  | 'unionpacific'
+  | 'calumet'
+  | 'gunbelt'
+  | 'horseshoe'
+  | 'pickaxe'
+  | 'wanted'
+  | 'goldpan'
+  | 'boots'
+  | 'luckycharm'
+  | 'rucksack'
+
+export interface GoldCard {
+  uid: number
+  key: GoldKey
+}
+
+export interface GoldState {
+  cards: GoldCard[]
+  deck: number[]
+  /** 商店裡翻開的三張 */
+  shop: number[]
+  nuggets: number[]
+  /** 每個人面前的黑框裝備（通緝令放在被通緝的人面前） */
+  equip: number[][]
+  /** 喬許．麥克勞德抽到、這回合可以免費使用的棕框裝備 */
+  free: (number | null)[]
+}
 
 export type CardColour = 'brown' | 'blue' | 'green'
 
@@ -80,8 +130,10 @@ export interface Player {
   alive: boolean
   /** 薇拉．卡斯特這一輪複製的角色 */
   copy?: string | null
-  /** 鬼鎮事件：死者以幽靈身分回來玩一回合 */
-  ghost?: boolean
+  /** 幽靈：town = 鬼鎮事件（玩一回合）、card = 幽谷的幽靈牌（牌在就留著） */
+  ghost?: 'town' | 'card' | null
+  /** 葛雷戈里．戴克這一輪得到的兩個角色能力 */
+  copies?: string[]
 }
 
 export interface GameConfig {
@@ -145,6 +197,14 @@ export type AskKind =
   | 'peyote' // 仙人掌：猜顏色
   | 'ranch' // 牧場：換牌
   | 'roulette' // 俄羅斯輪盤
+  | 'dutch' // 荷蘭佬威爾：兩張留一張
+  | 'evelyn' // 伊芙琳：放棄抽牌改開槍
+  | 'bandidos' // 土匪：棄 2 張或失去 1 點生命
+  | 'poker' // 撲克：棄一張手牌
+  | 'pokertake' // 撲克：沒有 A，拿走最多 2 張
+  | 'tornado' // 龍捲風：棄一張手牌
+  | 'lemonade' // 檸檬水吉姆：棄一張回 1 血
+  | 'youl' // 尤爾．葛林納：給他一張牌
 
 export interface Ask {
   k: 'ask'
@@ -165,6 +225,10 @@ export interface Ask {
   target?: number
   /** 跳彈打的那張牌 */
   targetCard?: number
+  /** 中彈時失去幾點生命（瞄準） */
+  dmg?: number
+  /** 開槍的那張牌（回火、懸賞用） */
+  bangCard?: boolean
 }
 
 export type Task =
@@ -173,8 +237,10 @@ export type Task =
   | { k: 'turnChecks' }
   | { k: 'drawPhase' }
   | { k: 'afterDraw' }
-  | { k: 'shot'; from: number | null; to: number; need: number; src: CardKey; suit?: Suit }
-  | { k: 'damage'; to: number; amount: number; from: number | null }
+  | { k: 'shot'; from: number | null; to: number; need: number; src: CardKey; suit?: Suit; dmg?: number; bangCard?: boolean; sure?: boolean }
+  | { k: 'damage'; to: number; amount: number; from: number | null; bangCard?: boolean }
+  | { k: 'drawN'; to: number; n: number }
+  | { k: 'pokerEnd'; user: number }
   | { k: 'afterDamage'; to: number; amount: number; from: number | null }
   | { k: 'die'; who: number; killer: number | null }
   | { k: 'endTurn' }
@@ -197,12 +263,22 @@ export interface Turn {
   drawn?: number[]
   /** 烈酒：這回合已經問過 */
   asked?: boolean
+  /** 這回合打出幾張牌（蘇珊娜小姐） */
+  played?: number
+  /** 淘金熱卡：回合結束後再玩一回合 */
+  again?: boolean
+  /** 蘇珊娜小姐已經罰過 */
+  susanna?: boolean
+  /** 響尾蛇這回合已經判定過 */
+  snake?: boolean
+  /** 李．范．克利夫：上一張打出的棕牌效果 */
+  last?: { as: PlayAs; target?: number; targetCard?: number | 'hand'; target2?: number; card: number } | null
 }
 
 export interface GameResult {
   winners: number[]
   /** 獲勝陣營 */
-  side: 'law' | 'outlaws' | 'renegade'
+  side: 'law' | 'outlaws' | 'renegade' | 'last'
   reason: string
 }
 
@@ -228,6 +304,10 @@ export interface GameState {
   result: GameResult | null
   /** 公開的「對警長的態度」：攻擊警長會減分，攻擊警長的敵人會加分（AI 用） */
   rep: number[]
+  /** 淘金熱 */
+  gold: GoldState | null
+  /** 撲克：大家棄出的牌 */
+  poker: number[]
   /** 回合方向（淘金潮事件會逆轉） */
   dir: 1 | -1
   /** 綠牌放上場的回合：下一回合起才能用 */
@@ -241,13 +321,13 @@ export interface GameState {
 
 export type Action =
   | { type: 'choose_character'; character: string }
-  | { type: 'play'; card: number; as?: PlayAs; target?: number; targetCard?: number | 'hand'; extra?: number[] }
+  | { type: 'play'; card: number; as?: PlayAs; target?: number; targetCard?: number | 'hand'; extra?: number[]; target2?: number }
   | { type: 'ability'; ability: AbilityId; cards?: number[]; target?: number }
   | { type: 'end_turn' }
   | { type: 'answer'; opt?: string; cards?: number[]; target?: number }
 
-export type PlayAs = CardKey | 'sniper' | 'ricochet'
-export type AbilityId = 'sid' | 'chuck' | 'jose' | 'doc'
+export type PlayAs = CardKey | GoldKey | 'sniper' | 'ricochet' | 'flower' | 'nugget' | 'golddrop'
+export type AbilityId = 'sid' | 'chuck' | 'jose' | 'doc' | 'jacky' | 'josh' | 'raddie' | 'goldpan' | 'rucksack' | 'flint' | 'lee'
 
 export interface AskOption {
   id: string
@@ -289,8 +369,12 @@ export interface LegalPlay {
   pickCard?: boolean
   /** 只能選場上的牌（跳彈） */
   tableOnly?: boolean
-  /** 從手牌還是場上的綠牌 */
-  source: 'hand' | 'table'
+  /** 從手牌、場上的綠牌，或淘金熱商店 */
+  source: 'hand' | 'table' | 'shop'
+  /** 商店價格（金塊） */
+  price?: number
+  /** 連開：第二個目標的候選（依第一個目標而定） */
+  second?: Record<number, number[]>
   /** 另外要棄幾張手牌當代價 */
   cost?: number
   /** 代價必須是哪種牌（狙擊手要另一張砰！） */

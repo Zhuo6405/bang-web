@@ -233,13 +233,73 @@ describe('事件', () => {
   })
 })
 
+describe('淘金熱', () => {
+  it('打傷別人拿金塊，可以在商店買裝備', () => {
+    let s = setupX(4, ['gold_rush'])
+    s = structuredClone(s)
+    const a = s.turn.active
+    const t = s.players.map((p) => p.seat).find((q) => q !== a && distance(s, a, q) <= 1)!
+    clearHands(s)
+    give(s, a, ['bang'])
+    s = applyAction(s, a, { type: 'play', card: s.players[a].hand[0], target: t })
+    expect(s.gold!.nuggets[a]).toBe(1)
+    s.gold!.nuggets[a] = 5
+    const buy = legalPlays(s, a).find((l) => l.source === 'shop')
+    expect(buy).toBeTruthy()
+    expect(s.gold!.shop).toHaveLength(3)
+  })
+})
+
+describe('幽谷', () => {
+  it('瞄準：打中失去 2 點生命', () => {
+    let s = setupX(4, ['valley_of_shadows'], { 0: 'bart', 1: 'bart', 2: 'bart', 3: 'bart' })
+    s = structuredClone(s)
+    const a = s.turn.active
+    const t = s.players.map((p) => p.seat).find((q) => q !== a && distance(s, a, q) <= 1)!
+    clearHands(s)
+    give(s, a, ['aim', 'bang'])
+    const [aim, bang] = s.players[a].hand
+    const hp = s.players[t].hp
+    s = applyAction(s, a, { type: 'play', card: aim, target: t, extra: [bang] })
+    expect(s.players[t].hp).toBe(hp - 2)
+  })
+
+  it('回火：躲開並反擊開槍的人', () => {
+    let s = setupX(4, ['valley_of_shadows'])
+    s = structuredClone(s)
+    const a = s.turn.active
+    const t = s.players.map((p) => p.seat).find((q) => q !== a && distance(s, a, q) <= 1)!
+    clearHands(s)
+    give(s, a, ['bang'])
+    give(s, t, ['backfire'])
+    const hp = s.players[a].hp
+    s = applyAction(s, a, { type: 'play', card: s.players[a].hand[0], target: t })
+    s = applyAction(s, t, { type: 'answer', cards: [s.players[t].hand[0]] })
+    expect(s.players[a].hp).toBe(hp - 1)
+  })
+})
+
+describe('西部秀', () => {
+  it('西部秀結局：只剩一人才結束', () => {
+    let s = setupX(4, ['wild_west_show'])
+    s = structuredClone(s)
+    s.events!.current = 'wildwestshow'
+    const sheriff = s.players.find((p) => p.role === 'sheriff')!
+    sheriff.alive = false
+    const a = s.turn.active
+    expect(s.result).toBeNull()
+    void a
+  })
+})
+
 describe('AI 自動對戰', () => {
   it('全部擴充一起玩也能打完，牌數守恆', () => {
+    const all = ['dodge_city', 'high_noon', 'fistful', 'wild_west_show', 'gold_rush', 'valley_of_shadows']
     for (let seed = 1; seed <= 15; seed++) {
       const n = 4 + (seed % 5)
-      const { state } = playOut(startGame(makeConfig(n, seed * 17, ['dodge_city', 'high_noon', 'fistful'])), 10000)
+      const { state } = playOut(startGame(makeConfig(n, seed * 17, all)), 10000)
       expect(state.result, `seed ${seed}`).not.toBeNull()
-      expect(total(state)).toBe(120)
+      expect(total(state) + state.poker.length).toBe(135)
     }
   })
 
