@@ -188,6 +188,27 @@ function Table({
     pick = { ids, min: l.cost!, max: l.cost! }
   } else if (ask && ask.zone === 'hand' && (ask.kind === 'discard' || ask.kind === 'ranch' || ask.kind === 'bandidos')) pick = { ids: ask.cards, min: ask.min, max: ask.max }
   const quickPick = !pick && ask && ask.zone === 'hand' && ask.max === 1
+  // 手機：點一下選牌，再點一下（或連點兩下）打出
+  const touch = useMemo(() => {
+    try {
+      return window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 760
+    } catch {
+      return false
+    }
+  }, [])
+  const [sheet, setSheet] = useState<number | null>(null)
+  useEffect(() => setSheet(null), [decKey])
+  /** 打出一張牌：不用選目標就直接打出，要選目標就開啟下方的選單 */
+  const playOrOpen = (id: number) => {
+    const ls = legalById.get(id) ?? []
+    setSel(id)
+    if (ls.length === 1 && !ls[0].targets && !ls[0].cost) {
+      ctl.act({ type: 'play', card: id, as: ls[0].as })
+      clear()
+      return
+    }
+    setSheet(id)
+  }
 
   const clickCard = (c: Card) => {
     if (pick) {
@@ -200,7 +221,12 @@ function Table({
       if (ask.cards.includes(c.id)) ctl.act({ type: 'answer', cards: [c.id] })
       return
     }
+    if (d?.type === 'play' && touch && sel === c.id) return playOrOpen(c.id)
     setSel(sel === c.id ? null : c.id)
+  }
+  const dblCard = (c: Card) => {
+    if (d?.type !== 'play' || pick || ask) return
+    playOrOpen(c.id)
   }
   const usable = (c: Card) => {
     if (pick) return pick.ids.includes(c.id)
@@ -296,15 +322,42 @@ function Table({
           costFor={costFor}
           setCostFor={setCostFor}
           clear={clear}
+          touch={touch}
+          openCard={playOrOpen}
         />
         <div className="hand" role="group" aria-label="手牌">
           {v.hand.length === 0 && <span className="muted">沒有手牌</span>}
           {v.hand.map((c) => (
-            <CardFace key={c.id} card={c} selected={sel === c.id || picked.includes(c.id)} usable={usable(c)} forced={v.must === c.id} onClick={() => clickCard(c)} />
+            <CardFace
+              key={c.id}
+              card={c}
+              selected={sel === c.id || picked.includes(c.id)}
+              usable={usable(c)}
+              forced={v.must === c.id}
+              onClick={() => clickCard(c)}
+              onDoubleClick={() => dblCard(c)}
+            />
           ))}
         </div>
       </section>
 
+      {sheet != null && d?.type === 'play' && (
+        <PlaySheet
+          v={v}
+          card={v.hand.find((c) => c.id === sheet) ?? me.table.find((c) => c.id === sheet) ?? null}
+          legal={legalById.get(sheet) ?? []}
+          onPlay={(a) => {
+            ctl.act(a)
+            clear()
+            setSheet(null)
+          }}
+          onCost={(l, target, targetCard) => {
+            setCostFor({ legal: l, target, targetCard })
+            setSheet(null)
+          }}
+          onClose={() => setSheet(null)}
+        />
+      )}
       {ctl.error && (
         <div className="toast" role="alert" onClick={ctl.clearError}>
           {ctl.error}
@@ -455,6 +508,8 @@ function Prompt({
   costFor,
   setCostFor,
   clear,
+  touch,
+  openCard,
 }: {
   v: GameView
   ctl: GameController
@@ -470,6 +525,8 @@ function Prompt({
   costFor: { legal: LegalPlay; target?: number; targetCard?: number | 'hand' } | null
   setCostFor: (c: { legal: LegalPlay; target?: number; targetCard?: number | 'hand' } | null) => void
   clear: () => void
+  touch: boolean
+  openCard: (id: number) => void
 }) {
   const d = v.decision
   const left = useSecondsLeft(d ? ctl.deadline : null)
@@ -555,7 +612,24 @@ function Prompt({
       </p>
 
       {d?.type === 'ask' && <AskPanel v={v} ask={d.ask} picked={picked} setPicked={setPicked} act={act} />}
-      {d?.type === 'play' && selCard && (
+      {d?.type === 'play' && selCard && touch && (
+        <div className="selected">
+          <p className="sel-desc">
+            <b>【{CARD_DEFS[selCard.key].name}】</b>
+            {CARD_DEFS[selCard.key].desc}
+          </p>
+          <div className="choices">
+            {legal.length ? (
+              <button type="button" className="primary" onClick={() => openCard(selCard.id)}>
+                打出這張牌（或再點一下牌）
+              </button>
+            ) : (
+              <span className="muted">{whyNot(v, selCard)}</span>
+            )}
+          </div>
+        </div>
+      )}
+      {d?.type === 'play' && selCard && !touch && (
         <div className="selected">
           <p className="sel-desc">
             <b>【{CARD_DEFS[selCard.key].name}】</b>
@@ -940,6 +1014,47 @@ function ShopPanel({ v, selShop, setSelShop, act }: { v: GameView; selShop: numb
           </div>
         </details>
       )}
+    </div>
+  )
+}
+
+/** 從下方滑出的出牌選單（手機連點兩下、電腦雙擊時開啟） */
+function PlaySheet({
+  v,
+  card,
+  legal,
+  onPlay,
+  onCost,
+  onClose,
+}: {
+  v: GameView
+  card: Card | null
+  legal: LegalPlay[]
+  onPlay: (a: Action) => void
+  onCost: (l: LegalPlay, target?: number, targetCard?: number | 'hand') => void
+  onClose: () => void
+}) {
+  if (!card) return null
+  return (
+    <div className="sheet-backdrop" onClick={onClose}>
+      <div className="sheet" role="dialog" aria-modal="true" aria-label={`打出【${CARD_DEFS[card.key].name}】`} onClick={(e) => e.stopPropagation()}>
+        <div className="sheet-head">
+          <CardFace card={card} small />
+          <p>
+            <b>【{CARD_DEFS[card.key].name}】</b>
+            {CARD_DEFS[card.key].desc}
+          </p>
+        </div>
+        <div className="choices sheet-choices">
+          {legal.map((l) => (
+            <PlayOptions key={`${l.as}-${l.source}`} legal={l} v={v} onPlay={onPlay} onCost={(t, tc) => onCost(l, t, tc)} />
+          ))}
+          {!legal.length && <span className="muted">{whyNot(v, card)}</span>}
+        </div>
+        <button type="button" className="sheet-close" onClick={onClose}>
+          取消
+        </button>
+      </div>
     </div>
   )
 }

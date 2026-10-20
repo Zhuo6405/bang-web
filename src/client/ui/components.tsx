@@ -8,11 +8,13 @@ export function CardFace({
   onClick,
   small,
   forced,
+  onDoubleClick,
 }: {
   card: Card
   selected?: boolean
   usable?: boolean
   onClick?: () => void
+  onDoubleClick?: () => void
   small?: boolean
   forced?: boolean
 }) {
@@ -37,7 +39,7 @@ export function CardFace({
       </div>
     )
   return (
-    <button type="button" className={cls} onClick={onClick} title={title} aria-pressed={selected} aria-label={`${def.name} ${SUIT_SYMBOL[card.suit]}${rankLabel(card.rank)}`}>
+    <button type="button" className={cls} onClick={onClick} onDoubleClick={onDoubleClick} title={title} aria-pressed={selected} aria-label={`${def.name} ${SUIT_SYMBOL[card.suit]}${rankLabel(card.rank)}`}>
       {inner}
     </button>
   )
