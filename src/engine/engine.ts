@@ -14,6 +14,7 @@ import {
   ROLE_SETUP,
   SUIT_NAME,
 } from './data'
+import { note, W } from './reputation'
 import type {
   CoinDuel,
   AbilityId,
@@ -278,7 +279,7 @@ export function startGame(config: GameConfig): GameState {
     fx: [],
     seq: 0,
     result: null,
-    rep: Array(n).fill(0),
+    rel: Array.from({ length: n }, () => Array(n).fill(0)),
     gold: null,
     poker: [],
     dir: 1,
@@ -975,13 +976,13 @@ function useAbility(s: GameState, p: number, a: Extract<Action, { type: 'ability
     case 'doc':
       discardPicked()
       log(s, `${me.name} 棄 2 張牌，對 ${nm(s, a.target!)} 開槍。`)
-      rep(s, p, a.target!)
+      note(s, p, a.target!, W.shoot)
       s.q.push({ k: 'shot', from: p, to: a.target!, need: 1, src: 'bang' })
       break
     case 'jacky':
       s.gold!.nuggets[p] -= 2
       log(s, `${me.name} 付 2 金塊，對 ${nm(s, a.target!)} 開槍。`)
-      rep(s, p, a.target!)
+      note(s, p, a.target!, W.shoot)
       s.q.push({ k: 'shot', from: p, to: a.target!, need: 1, src: 'bang' })
       break
     case 'josh': {
@@ -1010,6 +1011,7 @@ function useAbility(s: GameState, p: number, a: Extract<Action, { type: 'ability
       break
     case 'flint': {
       const t = a.target!
+      note(s, p, t, W.jesse)
       const give = cards[0]
       removeFromHand(s, p, give)
       const x = s.players[t]
@@ -1040,17 +1042,12 @@ function useAbility(s: GameState, p: number, a: Extract<Action, { type: 'ability
   }
 }
 
-function rep(s: GameState, user: number, target: number) {
-  const sheriff = s.players.findIndex((x) => x.role === 'sheriff')
-  if (target === sheriff) s.rep[user] -= 2
-  else if (s.rep[target] < 0) s.rep[user] += 1
-  else if (s.rep[target] > 0) s.rep[user] -= 1
-}
 
 /** 亨利．布洛克：誰動了他的牌就挨一槍 */
 function henry(s: GameState, victim: number, taker: number) {
   if (victim !== taker && hasChar(s, victim, 'henry') && isAlive(s, taker)) {
     log(s, `${nm(s, victim)} 對動他牌的 ${nm(s, taker)} 回敬一槍！`)
+    note(s, victim, taker, W.henry)
     s.q.push({ k: 'shot', from: victim, to: taker, need: 1, src: 'bang' })
   }
 }
@@ -1099,7 +1096,7 @@ function playCard(s: GameState, p: number, a: Extract<Action, { type: 'play' }>)
       s.players[q].table.push(c.id)
       log(s, `${me.name} ${what}`)
       fx(s, { kind: 'equip', from: p, to: q, card: c })
-      if (q !== p) rep(s, p, q)
+      if (q !== p) note(s, p, q, c.key === 'jail' ? W.jail : c.key === 'rattlesnake' ? W.rattlesnake : W.bounty)
       if (apacheBlocks(s, p, q, c)) {
         removeFromTable(s, q, c.id)
         toDiscard(s, c.id)
@@ -1116,6 +1113,7 @@ function playCard(s: GameState, p: number, a: Extract<Action, { type: 'play' }>)
       x.ghost = 'card'
       x.hp = 0
       log(s, `👻 ${me.name} 讓 ${x.name} 以幽靈身分回到牌桌！`)
+      note(s, p, t, W.revive)
       fx(s, { kind: 'revive', to: t })
       return
     }
@@ -1151,7 +1149,7 @@ function shopPlay(s: GameState, p: number, l: LegalPlay, a: Extract<Action, { ty
     g.equip[owner] = g.equip[owner].filter((x) => x !== uid)
     g.deck.push(uid)
     log(s, `${me.name} 付 ${l.price} 金塊，棄掉 ${nm(s, owner)} 的【${GOLD_DEFS[goldKey(s, uid)].name}】。`)
-    rep(s, p, owner)
+    note(s, p, owner, W.takeCard)
     return
   }
   const key = goldKey(s, uid)
@@ -1171,7 +1169,7 @@ function shopPlay(s: GameState, p: number, l: LegalPlay, a: Extract<Action, { ty
     fx(s, { kind: 'equip', from: p, to: owner })
     if (key === 'wanted') {
       log(s, `${nm(s, owner)} 被通緝了！`)
-      rep(s, p, owner)
+      note(s, p, owner, W.bounty)
     }
     return
   }
@@ -1191,7 +1189,7 @@ function effect(s: GameState, p: number, as: PlayAs, c: Card | null, t: number |
   }
   const suit = c ? suitOf(s, c) : undefined
   const shot = (to: number, need: number, src: CardKey, opts: { dmg?: number; bangCard?: boolean } = {}) => {
-    rep(s, p, to)
+    note(s, p, to, (opts.dmg ?? 1) >= 2 ? W.aim : W.shoot)
     let sure = false
     if (opts.bangCard && hasChar(s, p, 'colorado')) sure = !check(s, p, (x) => x.suit !== 'S', '科羅拉多比爾的能力')
     if (sure) log(s, `黑桃！這一槍躲不掉。`)
@@ -1224,7 +1222,7 @@ function effect(s: GameState, p: number, as: PlayAs, c: Card | null, t: number |
       const tc = targetCard as number
       if (!s.players[t!].table.includes(tc)) return
       log(s, `${me.name} 用【砰！】射擊 ${nm(s, t!)} 場上的${cardLabel(card(s, tc))}。`)
-      rep(s, p, t!)
+      note(s, p, t!, keyOf(s, tc) === 'jail' ? W.freeFromJail : keyOf(s, tc) === 'dynamite' ? W.removeDynamite : W.takeCard)
       s.q.push({ k: 'ask', kind: 'ricochet', player: t!, from: p, targetCard: tc })
       break
     }
@@ -1262,6 +1260,7 @@ function effect(s: GameState, p: number, as: PlayAs, c: Card | null, t: number |
     case 'tequila':
     case 'shotglass':
       heal(s, t!, 1)
+      note(s, p, t!, W.heal)
       log(s, `${me.name} 請 ${nm(s, t!)} 喝${via}（${s.players[t!].hp}/${s.players[t!].maxHp}）。`)
       break
     case 'saloon':
@@ -1323,7 +1322,10 @@ function effect(s: GameState, p: number, as: PlayAs, c: Card | null, t: number |
       log(s, `${me.name} 用${c && c.key !== as ? `${via}當作【格林機槍】` : via}掃射所有人！`)
       for (let q = nextAlive(s, p); q !== p; q = nextAlive(s, q)) {
         if (apacheBlocks(s, p, q, c)) log(s, `方塊牌對 ${nm(s, q)} 無效。`)
-        else s.q.push({ k: 'shot', from: p, to: q, need: 1, src: as === 'howitzer' ? 'howitzer' : 'gatling', suit })
+        else {
+          note(s, p, q, s.players[q].hp <= 1 ? W.areaLethal : W.area)
+          s.q.push({ k: 'shot', from: p, to: q, need: 1, src: as === 'howitzer' ? 'howitzer' : 'gatling', suit })
+        }
       }
       break
     case 'indians':
@@ -1333,7 +1335,10 @@ function effect(s: GameState, p: number, as: PlayAs, c: Card | null, t: number |
       if (as === 'poker') s.poker = []
       for (let q = nextAlive(s, p); q !== p; q = nextAlive(s, q)) {
         if (apacheBlocks(s, p, q, c)) log(s, `方塊牌對 ${nm(s, q)} 無效。`)
-        else if (as !== 'poker' || s.players[q].hand.length) s.q.push({ k: 'ask', kind: as, player: q, from: p })
+        else if (as !== 'poker' || s.players[q].hand.length) {
+          if (as === 'indians') note(s, p, q, s.players[q].hp <= 1 ? W.areaLethal : W.area)
+          s.q.push({ k: 'ask', kind: as, player: q, from: p })
+        }
       }
       if (as === 'poker') s.q.push({ k: 'pokerEnd', user: p })
       break
@@ -1352,7 +1357,7 @@ function effect(s: GameState, p: number, as: PlayAs, c: Card | null, t: number |
     }
     case 'duel':
       log(s, `${me.name} 向 ${nm(s, t!)} 提出【決鬥】！`)
-      rep(s, p, t!)
+      note(s, p, t!, W.shoot)
       s.q.push({ k: 'ask', kind: 'duel', player: t!, from: p })
       break
     case 'brawl':
@@ -1373,7 +1378,6 @@ function effect(s: GameState, p: number, as: PlayAs, c: Card | null, t: number |
       const which = targetCard === 'hand' && !s.players[t!].hand.length ? s.players[t!].table[0] : targetCard
       if (which !== 'hand' && !s.players[t!].table.includes(which as number)) return
       takeCard(s, p, t!, which!, steal, via)
-      rep(s, p, t!)
       break
     }
     default:
@@ -1382,9 +1386,11 @@ function effect(s: GameState, p: number, as: PlayAs, c: Card | null, t: number |
 }
 
 /** 拿走（或棄掉）別人的一張牌 */
-function takeCard(s: GameState, p: number, t: number, which: number | 'hand', steal: boolean, via: string) {
+function takeCard(s: GameState, p: number, t: number, which: number | 'hand', steal: boolean, via: string, w: number = W.takeCard) {
   const x = s.players[t]
   const me = s.players[p]
+  // 拿掉別人的監獄或炸藥是在幫他
+  note(s, p, t, which === 'hand' ? w : keyOf(s, which) === 'jail' ? W.freeFromJail : keyOf(s, which) === 'dynamite' ? W.removeDynamite : w)
   let taken: number
   if (which === 'hand') {
     if (!x.hand.length) return
@@ -1453,6 +1459,7 @@ function answer(s: GameState, a: Ask, ans: Extract<Action, { type: 'answer' }>) 
         if (k === 'dodge' || k === 'bible') draw(s, p, 1)
         if (k === 'backfire' && a.from != null && isAlive(s, a.from)) {
           log(s, `${me.name} 回火反擊 ${nm(s, a.from)}！`)
+          note(s, p, a.from, W.backfire)
           s.q.push({ k: 'shot', from: p, to: a.from, need: 1, src: 'backfire' })
         }
       }
@@ -1551,6 +1558,7 @@ function answer(s: GameState, a: Ask, ans: Extract<Action, { type: 'answer' }>) 
         const id = x.hand[Math.floor(rand(s) * x.hand.length)]
         removeFromHand(s, ans.target, id)
         me.hand.push(id)
+        note(s, p, ans.target, W.jesse)
         log(s, `${me.name} 從 ${x.name} 手上拿了一張牌。`)
         fx(s, { kind: 'steal', from: ans.target, to: p })
         henry(s, ans.target, p)
@@ -1575,7 +1583,7 @@ function answer(s: GameState, a: Ask, ans: Extract<Action, { type: 'answer' }>) 
       if (id != null) {
         if (!view.cards.includes(id)) fail('請選場上的一張牌')
         const owner = s.players.find((x) => x.table.includes(id))!.seat
-        takeCard(s, p, owner, id, true, '派特的能力')
+        takeCard(s, p, owner, id, true, '派特的能力', W.pat)
       } else phaseDraw(s, p, drawCount(s, p))
       return
     }
@@ -1584,7 +1592,7 @@ function answer(s: GameState, a: Ask, ans: Extract<Action, { type: 'answer' }>) 
       if (ans.target != null) {
         if (!view.targets.includes(ans.target)) fail('請選射程內還沒開過槍的人')
         log(s, `${me.name} 少抽 1 張，對 ${nm(s, ans.target)} 開槍。`)
-        rep(s, p, ans.target)
+        note(s, p, ans.target, W.shoot)
         s.q.unshift({ k: 'shot', from: p, to: ans.target, need: 1, src: 'bang' }, { ...a, got: (a.got ?? 0) + 1, cards: [...(a.cards ?? []), ans.target] })
         return
       }
@@ -1605,7 +1613,7 @@ function answer(s: GameState, a: Ask, ans: Extract<Action, { type: 'answer' }>) 
       const x = s.players[a.target!]
       const which: number | 'hand' = ans.opt === 'hand' ? 'hand' : (ans.cards?.[0] ?? (x.hand.length ? 'hand' : x.table[0]))
       if (which !== 'hand' && !view.cards.includes(which)) fail('請選他場上的一張牌')
-      takeCard(s, p, a.target!, which, false, '【鬥毆】')
+      takeCard(s, p, a.target!, which, false, '【鬥毆】', W.brawl)
       return
     }
     case 'ricochet': {
@@ -1659,6 +1667,7 @@ function answer(s: GameState, a: Ask, ans: Extract<Action, { type: 'answer' }>) 
         me.hp--
         fx(s, { kind: 'hit', to: p, amount: 1 })
         heal(s, ans.target, 1)
+        note(s, p, ans.target, W.heal)
         log(s, `${me.name} 失去 1 點生命，讓 ${nm(s, ans.target)} 回 1 點。`)
       }
       return
@@ -2359,6 +2368,7 @@ function die(s: GameState, who: number, killer: number | null) {
   }
   x.alive = false
   x.hp = 0
+  note(s, killer, who, W.kill)
   if (s.firstDead == null) s.firstDead = who
   log(s, `💀 ${x.name} 死亡，身份是【${ROLE_NAME[x.role]}】。`)
   fx(s, { kind: 'death', from: killer ?? undefined, to: who })

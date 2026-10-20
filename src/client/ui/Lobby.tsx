@@ -48,10 +48,14 @@ export function Lobby({
 
   const startLocal = () => {
     const me = myName() || '我'
-    const names = [...AI_NAMES].sort(() => Math.random() - 0.5)
+    const names = [...AI_NAMES].filter((x) => x !== me).sort(() => Math.random() - 0.5)
+    // 座位隨機：你不一定坐第一個
+    const seat = Math.floor(Math.random() * count)
+    const seated = names.slice(0, count - 1)
+    seated.splice(seat, 0, me)
     onLocal({
-      names: [me, ...names.slice(0, count - 1)],
-      ai: [false, ...Array(count - 1).fill(true)],
+      names: seated,
+      ai: seated.map((_, i) => i !== seat),
       seed: (Math.random() * 2 ** 31) | 0,
       expansions,
     })

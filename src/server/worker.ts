@@ -360,12 +360,26 @@ export class Room extends DurableObject<Env> {
     const humans = d.members.filter((m) => m.connected)
     const n = Math.max(d.settings.count, humans.length)
     d.members = humans
-    humans.forEach((m, i) => (m.seat = i))
+    // 座位隨機：真人和電腦打散坐
+    const order = Array.from({ length: n }, (_, i) => i)
+    for (let i = n - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[order[i], order[j]] = [order[j], order[i]]
+    }
+    humans.forEach((m, i) => (m.seat = order[i]))
     const used = new Set(humans.map((m) => m.name))
-    const names = AI_NAMES.filter((x) => !used.has(x)).sort(() => Math.random() - 0.5)
+    const aiNames = AI_NAMES.filter((x) => !used.has(x)).sort(() => Math.random() - 0.5)
+    const seatNames: string[] = Array(n).fill('')
+    const ai: boolean[] = Array(n).fill(true)
+    humans.forEach((m) => {
+      seatNames[m.seat!] = m.name
+      ai[m.seat!] = false
+    })
+    let k = 0
+    for (let i = 0; i < n; i++) if (!seatNames[i]) seatNames[i] = aiNames[k++] ?? `電腦${k}`
     const config: GameConfig = {
-      names: [...humans.map((m) => m.name), ...Array.from({ length: n - humans.length }, (_, i) => names[i] ?? `電腦${i + 1}`)],
-      ai: [...humans.map(() => false), ...Array.from({ length: n - humans.length }, () => true)],
+      names: seatNames,
+      ai,
       seed: (Math.random() * 2 ** 31) | 0,
       expansions: d.settings.expansions,
     }

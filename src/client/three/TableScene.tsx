@@ -160,8 +160,29 @@ export interface SceneProps {
   selected?: number | null
 }
 
+function watchContext(canvas: HTMLCanvasElement, rebuild: () => void) {
+  let done = false
+  const go = () => {
+    if (done) return
+    done = true
+    setTimeout(rebuild, 300)
+  }
+  canvas.addEventListener('webglcontextlost', (e) => {
+    e.preventDefault()
+    go()
+  })
+  const onVisible = () => {
+    if (document.visibilityState !== 'visible') return
+    const gl = (canvas.getContext('webgl2') ?? canvas.getContext('webgl')) as WebGLRenderingContext | null
+    if (gl?.isContextLost()) go()
+  }
+  document.addEventListener('visibilitychange', onVisible)
+}
+
 export function TableScene(props: SceneProps) {
   const [fontsReady, setFontsReady] = useState(0)
+  // 手機瀏覽器在記憶體吃緊時會收回 WebGL，收回後重新建立牌桌，不會留下一片空白
+  const [revive, setRevive] = useState(0)
   useEffect(() => {
     void document.fonts?.ready.then(() => {
       clearTextures()
@@ -172,7 +193,7 @@ export function TableScene(props: SceneProps) {
   return (
     <div ref={host} className="scene-host">
       <PlateHost.Provider value={host}>
-        <Canvas shadows dpr={[1, 2]} camera={{ position: [0, 6.4, 8.2], fov: 44 }} gl={{ antialias: true }} key={fontsReady}>
+        <Canvas shadows dpr={[1, 2]} camera={{ position: [0, 6.4, 8.2], fov: 44 }} gl={{ antialias: true }} key={`${fontsReady}-${revive}`} onCreated={({ gl }) => watchContext(gl.domElement, () => setRevive((x) => x + 1))}>
           <Inner {...props} />
         </Canvas>
       </PlateHost.Provider>

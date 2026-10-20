@@ -32,7 +32,9 @@ export function useStore(s: { subscribe: (fn: () => void) => () => void; version
 
 /** 單機：人類坐 0 號位，其他都是 AI，不限時 */
 export function useLocalController(config: GameConfig): GameController {
-  const [runner] = useState(() => new GameRunner(config, [0], { aiDelay: 550, timeouts: null }))
+  // 真人坐在哪個位子由大廳隨機決定（config.ai 裡唯一的 false）
+  const me = Math.max(0, config.ai.findIndex((x) => !x))
+  const [runner] = useState(() => new GameRunner(config, [me], { aiDelay: 550, timeouts: null }))
   const [, setTick] = useState(0)
   const [error, setError] = useState<string | null>(null)
   useEffect(() => {
@@ -42,9 +44,9 @@ export function useLocalController(config: GameConfig): GameController {
     }
   }, [runner])
   useEffect(() => () => runner.dispose(), [runner])
-  const act = useCallback((a: Action) => setError(runner.submit(0, a)), [runner])
+  const act = useCallback((a: Action) => setError(runner.submit(me, a)), [runner, me])
   const state = runner.state
-  const view = useMemo(() => viewFor(state, 0), [state])
+  const view = useMemo(() => viewFor(state, me), [state, me])
   return {
     view,
     act,

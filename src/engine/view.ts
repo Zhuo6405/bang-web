@@ -1,4 +1,5 @@
 import { distance, evOn, getDecisions, goldKey, legalAbilities, legalPlays, weaponRange } from './engine'
+import { reputation } from './reputation'
 import type { Card, CoinDuel, Decision, Fx, GameResult, GameState, GoldKey, LegalAbility, LegalPlay, LogEntry, Role, Suit } from './types'
 
 export interface PublicPlayer {
@@ -15,6 +16,7 @@ export interface PublicPlayer {
   role: Role | null
   /** 從你的位置看過去的距離 */
   dist: number
+  /** 公開的立場分數：> 0 像警長方，< 0 像歹徒（只根據大家看得到的行為） */
   rep: number
   ghost: boolean
   nuggets: number
@@ -70,6 +72,7 @@ export function viewFor(s: GameState, me: number): GameView {
   const over = !!s.result
   const decs = getDecisions(s)
   const mine = decs.find((d) => d.player === me) ?? null
+  const rep = reputation(s)
   return {
     me,
     phase: s.turn.phase,
@@ -89,7 +92,7 @@ export function viewFor(s: GameState, me: number): GameView {
       character: p.character,
       role: over || p.seat === me || p.role === 'sheriff' || !p.alive || p.ghost ? p.role : null,
       dist: p.seat === me || !p.alive || !s.players[me].alive || s.turn.phase === 'choose' ? 0 : distance(s, me, p.seat),
-      rep: s.rep[p.seat],
+      rep: rep[p.seat],
       ghost: !!p.ghost,
       nuggets: s.gold?.nuggets[p.seat] ?? 0,
       gold: (s.gold?.equip[p.seat] ?? []).map((uid) => ({ uid, key: goldKey(s, uid) })),
@@ -127,7 +130,8 @@ export function viewFor(s: GameState, me: number): GameView {
     goldDeck: s.gold?.deck.length ?? 0,
     myNuggets: s.gold?.nuggets[me] ?? 0,
     myFree: s.gold?.free[me] != null ? { uid: s.gold.free[me]!, key: goldKey(s, s.gold.free[me]!) } : null,
-    log: s.log.slice(-120),
+    // 結束後給完整紀錄，讓大家回頭看
+    log: s.result ? s.log : s.log.slice(-120),
     fx: s.fx,
     result: s.result,
   }

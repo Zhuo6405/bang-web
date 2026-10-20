@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { CARD_DEFS, CHAR_BY_ID, EVENT_BY_ID, GOLD_DEFS, ROLE_GOAL, ROLE_NAME, SUIT_NAME, SUIT_SYMBOL } from '../../engine/data'
 import { playName as enginePlayName } from '../../engine/engine'
-import type { Action, AskView, Card, GameConfig, GoldKey, LegalAbility, LegalPlay, PlayAs } from '../../engine/types'
+import type { Action, AskView, Card, GameConfig, GoldKey, LegalAbility, LegalPlay, LogEntry, PlayAs } from '../../engine/types'
 import type { GameView } from '../../engine/view'
 import { CardFace, RoleBadge } from './components'
 import { useLocalController, useSecondsLeft, type GameController, type Social } from './controller'
@@ -99,6 +99,7 @@ function Table({
   const [seenChat, setSeenChat] = useState(0)
   const [sideOpen, setSideOpen] = useState(false)
   const [inspect, setInspect] = useState<number | null>(null)
+  const history = useLogHistory(v.log)
   useEffect(() => {
     const on = (e: Event) => setInspect((e as CustomEvent<number>).detail)
     window.addEventListener('bang-inspect', on)
@@ -346,7 +347,7 @@ function Table({
           {ctl.error}
         </div>
       )}
-      {v.result && <Result v={v} actions={resultActions} />}
+      {v.result && <Result v={v} actions={resultActions} history={history} />}
     </div>
   )
 }
@@ -950,6 +951,16 @@ function AskPanel({ v, ask, picked, setPicked, act }: { v: GameView; ask: AskVie
   )
 }
 
+const logClass = (l: LogEntry) =>
+  [
+    l.text.startsWith('──') ? 'is-turn' : '',
+    l.text.startsWith('遊戲結束') ? 'is-end' : '',
+    l.text.startsWith('💀') ? 'is-death' : '',
+    l.text.startsWith('📜') ? 'is-event' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
 function Log({ v }: { v: GameView }) {
   const ref = useRef<HTMLOListElement>(null)
   useEffect(() => {
@@ -961,14 +972,7 @@ function Log({ v }: { v: GameView }) {
       {v.log.map((l) => (
         <li
           key={l.seq}
-          className={[
-            l.text.startsWith('──') ? 'is-turn' : '',
-            l.text.startsWith('遊戲結束') ? 'is-end' : '',
-            l.text.startsWith('💀') ? 'is-death' : '',
-            l.text.startsWith('📜') ? 'is-event' : '',
-          ]
-            .filter(Boolean)
-            .join(' ')}
+          className={logClass(l)}
         >
           {l.text}
         </li>
@@ -977,9 +981,43 @@ function Log({ v }: { v: GameView }) {
   )
 }
 
-function Result({ v, actions }: { v: GameView; actions: ReactNode }) {
+/** 整局的紀錄：引擎只保留最近幾百行，這裡把看過的都累積起來 */
+function useLogHistory(log: LogEntry[]) {
+  const all = useRef(new Map<number, LogEntry>())
+  for (const l of log) all.current.set(l.seq, l)
+  return [...all.current.values()].sort((a, b) => a.seq - b.seq)
+}
+
+function Result({ v, actions, history }: { v: GameView; actions: ReactNode; history: LogEntry[] }) {
   const r = v.result!
   const won = r.winners.includes(v.me)
+  const [mode, setMode] = useState<'summary' | 'log' | 'hidden'>('summary')
+  if (mode === 'hidden')
+    return (
+      <button type="button" className="primary result-reopen" onClick={() => setMode('summary')}>
+        看結算
+      </button>
+    )
+  if (mode === 'log')
+    return (
+      <div className="overlay" role="dialog" aria-modal="true" aria-label="整局紀錄">
+        <div className="result result-log">
+          <div className="result-log-head">
+            <h2>整局紀錄</h2>
+            <button type="button" className="primary" onClick={() => setMode('summary')}>
+              回到結算
+            </button>
+          </div>
+          <ol className="log full-log">
+            {history.map((l) => (
+              <li key={l.seq} className={logClass(l)}>
+                {l.text}
+              </li>
+            ))}
+          </ol>
+        </div>
+      </div>
+    )
   return (
     <div className="overlay" role="dialog" aria-modal="true" aria-label="遊戲結果">
       <div className="result">
@@ -997,7 +1035,15 @@ function Result({ v, actions }: { v: GameView; actions: ReactNode }) {
             ))}
           </tbody>
         </table>
-        <div className="result-actions">{actions}</div>
+        <div className="result-actions">
+          <button type="button" onClick={() => setMode('log')}>
+            查看整局紀錄
+          </button>
+          <button type="button" onClick={() => setMode('hidden')}>
+            看牌桌
+          </button>
+          {actions}
+        </div>
       </div>
     </div>
   )

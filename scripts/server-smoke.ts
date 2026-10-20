@@ -44,7 +44,7 @@ class Bot {
   maybeAct() {
     const v = this.game?.view
     if (!v?.decision || v.result) return
-    const key = `${v.log.length}-${JSON.stringify(v.decision)}`
+    const key = `${v.log.at(-1)?.seq ?? 0}-${v.turnNo}-${JSON.stringify(v.decision)}`
     if (key === this.lastKey) return
     this.lastKey = key
     setTimeout(() => {

@@ -302,8 +302,8 @@ export interface GameState {
   fx: Fx[]
   seq: number
   result: GameResult | null
-  /** 公開的「對警長的態度」：攻擊警長會減分，攻擊警長的敵人會加分（AI 用） */
-  rep: number[]
+  /** 公開的互動紀錄 rel[a][b]：a 對 b 的敵意（負數＝幫忙），用來推算立場（見 reputation.ts） */
+  rel: number[][]
   /** 淘金熱 */
   gold: GoldState | null
   /** 撲克：大家棄出的牌 */

@@ -119,7 +119,8 @@ function hostility(v: GameView, q: PublicPlayer): number {
         if (unknown.length <= renegadesLeft) return 5
         return -q.rep + urgency * 0.6
       }
-      return -q.rep + (role === 'sheriff' ? 0.3 : 0) + urgency * 0.3
+      // 沒有線索（分數接近 0）時：警長會先開槍試探，副警長先按兵不動以免誤傷自己人
+      return -q.rep + (role === 'sheriff' ? 0.3 : -0.15) + urgency * 0.3
     }
     case 'outlaw':
       if (q.seat === sh) return 10
@@ -382,8 +383,7 @@ function playTurn(v: GameView): Action {
   for (const l of byAs('fanning')) {
     const t = enemies(v, l.targets!)[0]
     if (t) {
-      const second = [...(l.second?.[t.seat] ?? [])].sort((a, b) => hostility(v, v.players[b]) - hostility(v, v.players[a]))[0]
-      return { ...(play(v, l, t.seat) as Extract<Action, { type: 'play' }>), target2: second }
+      return play(v, l, t.seat)
     }
   }
 
@@ -477,7 +477,10 @@ function play(v: GameView, l: LegalPlay, target?: number, targetCard?: number | 
     const pool = v.hand.filter((c) => c.id !== l.card && (!l.costKind || c.key === 'bang' || (l.costKind === 'bang' && c.key === 'missed' && v.players[v.me].character === 'calamity')))
     extra = [...pool].sort((a, b) => value(v, a) - value(v, b)).slice(0, l.cost).map((c) => c.id)
   }
-  return { type: 'play', card: l.card, as: l.as, target, targetCard, extra }
+  // 連開這類要第二個目標的：挑最有敵意的那個（不管從哪條路徑打出都補上）
+  const opts = target != null ? (l.second?.[target] ?? []) : []
+  const target2 = opts.length ? [...opts].sort((a, b) => hostility(v, v.players[b]) - hostility(v, v.players[a]))[0] : undefined
+  return { type: 'play', card: l.card, as: l.as, target, targetCard, extra, target2 }
 }
 
 export const charName = (id: string) => CHAR_BY_ID[id]?.name ?? id
