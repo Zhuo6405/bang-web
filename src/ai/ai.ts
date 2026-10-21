@@ -1,5 +1,6 @@
-import { CARD_DEFS, CHAR_BY_ID, ROLE_SETUP } from '../engine/data'
-import type { Action, AskView, Card, CardKey, LegalPlay, Role, Suit } from '../engine/types'
+import { CARD_DEFS, CHAR_BY_ID } from '../engine/data'
+import { ally, beliefOf, hostility, sloppy } from './mind'
+import type { Action, AskView, Card, CardKey, LegalPlay, Suit } from '../engine/types'
 import type { GameView, PublicPlayer } from '../engine/view'
 
 // 簡單的啟發式 AI：只看自己的視角（不作弊）
@@ -89,50 +90,6 @@ function value(v: GameView, c: Card) {
 
 const sheriffSeat = (v: GameView) => v.players.find((p) => p.role === 'sheriff')?.seat ?? -1
 
-/** 某身份還有幾個活著（由開局配置與已公開的死者推算） */
-function remaining(v: GameView, role: Role) {
-  const total = (ROLE_SETUP[v.players.length] ?? []).filter((r) => r === role).length
-  return total - v.players.filter((p) => !p.alive && p.role === role).length
-}
-
-/** 對方是敵人的程度：> 0 敵人，< 0 自己人 */
-function hostility(v: GameView, q: PublicPlayer): number {
-  const me = v.players[v.me]
-  const role = me.role!
-  const sh = sheriffSeat(v)
-  const living = v.players.filter((p) => p.alive)
-  // 拖太久就越來越好戰，避免僵局
-  const urgency = Math.min(3, v.turnNo / 30)
-  if (q.seat === v.me) return -99
-  // 西部秀結局：人人都是敵人
-  if (v.event === 'wildwestshow') return 5 - q.hp * 0.1
-  const outlawsLeft = remaining(v, 'outlaw')
-  const renegadesLeft = remaining(v, 'renegade')
-  switch (role) {
-    case 'sheriff':
-    case 'deputy': {
-      if (q.role === 'sheriff') return -10
-      if (outlawsLeft === 0) {
-        const unknown = living.filter((p) => p.seat !== v.me && p.role !== 'sheriff')
-        const deputiesLeft = remaining(v, 'deputy') - (role === 'deputy' ? 1 : 0)
-        if (deputiesLeft <= 0) return 5
-        if (unknown.length <= renegadesLeft) return 5
-        return -q.rep + urgency * 0.6
-      }
-      // 沒有線索（分數接近 0）時：警長會先開槍試探，副警長先按兵不動以免誤傷自己人
-      return -q.rep + (role === 'sheriff' ? 0.3 : -0.15) + urgency * 0.3
-    }
-    case 'outlaw':
-      if (q.seat === sh) return 10
-      return q.rep * 1.2 + 0.1 + urgency * 0.4
-    case 'renegade': {
-      if (q.seat === sh) return living.length <= 2 ? 10 : q.hp <= 2 ? -5 : -1 + urgency * 0.2
-      if (outlawsLeft === 0) return 4
-      return -q.rep + 0.2 + urgency * 0.3
-    }
-  }
-}
-
 function enemies(v: GameView, among: number[]) {
   return among
     .map((s) => v.players[s])
@@ -214,7 +171,7 @@ function answer(v: GameView, a: AskView): Action {
     }
     case 'brawl': {
       const owner = v.players.find((p) => a.shown.length && p.table.some((c) => c.id === a.shown[0].id))
-      if (owner && hostility(v, owner) < 0) {
+      if (owner && ally(v, owner)) {
         const bad = a.shown.find((c) => c.key === 'jail' || c.key === 'dynamite')
         if (bad) return { type: 'answer', cards: [bad.id] }
       }
@@ -237,7 +194,7 @@ function answer(v: GameView, a: AskView): Action {
       return { type: 'answer', opt: me.hp <= 1 ? 'swap' : 'keep' }
     case 'blood': {
       const sh = sheriffSeat(v)
-      const friend = a.targets.find((q) => hostility(v, v.players[q]) < 0 && v.players[q].hp <= 2)
+      const friend = a.targets.find((q) => ally(v, v.players[q]) && v.players[q].hp <= 2)
       if (me.hp >= 3 && friend != null && (friend === sh || rnd() < 0.5)) return { type: 'answer', target: friend }
       return { type: 'answer', opt: 'skip' }
     }
@@ -290,12 +247,14 @@ const PRIORITY: CardKey[] = [
 
 function playTurn(v: GameView): Action {
   const me = v.players[v.me]
+  // 簡單難度偶爾會忘了出牌就結束回合
+  if (sloppy(v) && rnd() < 0.5 && v.must == null) return { type: 'end_turn' }
   const legal = v.legal
   const byAs = (k: string) => legal.filter((l) => l.as === k && l.source !== 'shop')
   const cardOf = (l: LegalPlay) => (l.source === 'table' ? me.table : v.hand).find((c) => c.id === l.card)!
   const others = v.players.filter((p) => p.alive && p.seat !== v.me)
   const foes = enemies(v, others.map((p) => p.seat))
-  const friends = others.filter((p) => hostility(v, p) < 0)
+  const friends = others.filter((p) => ally(v, p))
   const hurt = me.hp < me.maxHp
 
   // 西部法則：必須先打出亮出的牌
@@ -350,7 +309,7 @@ function playTurn(v: GameView): Action {
     if (key === 'goldrushcard' && me.hp <= me.maxHp - 2) return play(v, l)
     if (key === 'rum' && me.maxHp - me.hp >= 2) return play(v, l)
     if (key === 'shotglass') {
-      const t = l.targets!.map((q) => v.players[q]).filter((p) => hostility(v, p) < 0 || p.seat === v.me).sort((a, b) => a.hp - b.hp)[0]
+      const t = l.targets!.map((q) => v.players[q]).filter((p) => ally(v, p)).sort((a, b) => a.hp - b.hp)[0]
       if (t) return play(v, l, t.seat)
     }
     if ((key === 'wanted' || key === 'bang' || key === 'duel') && l.targets) {
@@ -372,7 +331,7 @@ function playTurn(v: GameView): Action {
       if (t) return play(v, l, t.seat)
     }
   for (const l of byAs('ghostcard')) {
-    const f = l.targets!.find((q) => v.players[q].role && hostility(v, v.players[q]) < 0)
+    const f = l.targets!.find((q) => v.players[q].role && ally(v, v.players[q]))
     if (f != null) return play(v, l, f)
   }
   for (const k of ['tomahawk', 'flower', 'aim'] as const)
@@ -409,7 +368,7 @@ function playTurn(v: GameView): Action {
   }
   for (const l of byAs('whisky')) if (me.maxHp - me.hp >= 1) return play(v, l)
   for (const l of byAs('tequila')) {
-    const t = l.targets!.map((q) => v.players[q]).filter((p) => hostility(v, p) < 0 || p.seat === v.me).sort((a, b) => a.hp - b.hp)[0]
+    const t = l.targets!.map((q) => v.players[q]).filter((p) => ally(v, p)).sort((a, b) => a.hp - b.hp)[0]
     if (t) return play(v, l, t.seat)
   }
   for (const l of byAs('saloon')) if (hurt || friends.some((f) => f.hp < f.maxHp)) return play(v, l)
@@ -423,7 +382,7 @@ function playTurn(v: GameView): Action {
       const t = enemies(v, l.targets!)[0]
       if (t) return play(v, l, t.seat, pickTargetCard(t, false))
       // 幫自己人拆掉監獄或炸藥
-      const f = l.targets!.map((s) => v.players[s]).find((p) => hostility(v, p) < 0 && p.table.some((c) => c.key === 'jail' || c.key === 'dynamite'))
+      const f = l.targets!.map((s) => v.players[s]).find((p) => ally(v, p) && p.table.some((c) => c.key === 'jail' || c.key === 'dynamite'))
       if (f) return play(v, l, f.seat, f.table.find((c) => c.key === 'jail' || c.key === 'dynamite')!.id)
     }
   }
@@ -448,9 +407,10 @@ function playTurn(v: GameView): Action {
   for (const l of byAs('bang')) {
     const t = enemies(v, l.targets!)[0]
     if (t) return play(v, l, t.seat)
-    if (me.role === 'sheriff' && v.turnNo > 1 && rnd() < 0.35) {
-      const pick = l.targets!.filter((s) => v.players[s].rep <= 0)
-      if (pick.length) return play(v, l, pick[Math.floor(rnd() * pick.length)])
+    // 警長試探：沒有把握的對象時，偶爾對最可疑的人開一槍
+    if (me.role === 'sheriff' && v.turnNo > 1 && rnd() < 0.25) {
+      const pick = [...l.targets!].sort((a, b) => (beliefOf(v, b).outlaw ?? 0) - (beliefOf(v, a).outlaw ?? 0))[0]
+      if (pick != null && (beliefOf(v, pick).outlaw ?? 0) >= 0.45) return play(v, l, pick)
     }
   }
   for (const l of byAs('ricochet')) {

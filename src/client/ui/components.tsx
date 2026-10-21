@@ -1,4 +1,6 @@
-import { CARD_DEFS, rankLabel, ROLE_NAME, SUIT_SYMBOL } from '../../engine/data'
+import { CARD_DEFS, rankLabel, SUIT_SYMBOL } from '../../engine/data'
+import { cardDesc, cardName, roleName } from '../../engine/i18n'
+import { getLang, t } from '../lang'
 import type { Card, Role } from '../../engine/types'
 
 export function CardFace({
@@ -19,17 +21,19 @@ export function CardFace({
   forced?: boolean
 }) {
   const def = CARD_DEFS[card.key]
+  const l = getLang()
+  const name = cardName(card.key, l)
   const red = card.suit === 'H' || card.suit === 'D'
   const cls = ['card', `c-${def.colour}`, selected && 'is-selected', usable && 'is-usable', small && 'is-small', forced && 'is-forced'].filter(Boolean).join(' ')
-  const title = `${def.name}（${SUIT_SYMBOL[card.suit]}${rankLabel(card.rank)}）\n${def.desc}`
+  const title = `${name} (${SUIT_SYMBOL[card.suit]}${rankLabel(card.rank)})\n${cardDesc(card.key, l)}`
   const inner = (
     <>
       <span className={`card-suit ${red ? 'is-red' : ''}`}>
         {rankLabel(card.rank)}
         {SUIT_SYMBOL[card.suit]}
       </span>
-      <span className="card-name">{def.name}</span>
-      {!small && <span className="card-type">{def.colour === 'blue' ? (def.range ? `射程 ${def.range}` : '裝備') : def.colour === 'green' ? '綠牌' : def.cost ? '另棄 1 張' : '立即使用'}</span>}
+      <span className="card-name">{name}</span>
+      {!small && <span className="card-type">{def.colour === 'blue' ? (def.range ? t(`射程 ${def.range}`, `Range ${def.range}`) : t('裝備', 'Equipment')) : def.colour === 'green' ? t('綠牌', 'Green') : def.cost ? t('另棄 1 張', '+1 discard') : t('立即使用', 'Play now')}</span>}
     </>
   )
   if (!onClick)
@@ -39,12 +43,12 @@ export function CardFace({
       </div>
     )
   return (
-    <button type="button" className={cls} onClick={onClick} onDoubleClick={onDoubleClick} title={title} aria-pressed={selected} aria-label={`${def.name} ${SUIT_SYMBOL[card.suit]}${rankLabel(card.rank)}`}>
+    <button type="button" className={cls} onClick={onClick} onDoubleClick={onDoubleClick} title={title} aria-pressed={selected} aria-label={`${name} ${SUIT_SYMBOL[card.suit]}${rankLabel(card.rank)}`}>
       {inner}
     </button>
   )
 }
 
 export function RoleBadge({ role }: { role: Role }) {
-  return <span className={`role r-${role}`}>{ROLE_NAME[role]}</span>
+  return <span className={`role r-${role}`}>{roleName(role, getLang())}</span>
 }

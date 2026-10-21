@@ -1,7 +1,9 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { CARD_DEFS, CHAR_BY_ID, EVENT_BY_ID, GOLD_DEFS, ROLE_GOAL, ROLE_NAME, SUIT_NAME, SUIT_SYMBOL } from '../../engine/data'
+import { CARD_DEFS, GOLD_DEFS, SUIT_SYMBOL } from '../../engine/data'
+import { cardDesc, cardName, charName, charText, eventName, eventText, goldDesc, goldName, roleGoal, roleName, suitName } from '../../engine/i18n'
+import { getLang, LangToggle, t, tx } from '../lang'
 import { playName as enginePlayName } from '../../engine/engine'
-import type { Action, AskView, Card, GameConfig, GoldKey, LegalAbility, LegalPlay, LogEntry, PlayAs } from '../../engine/types'
+import type { Action, AskView, Card, CardKey, GameConfig, GoldKey, LegalAbility, LegalPlay, LogEntry, PlayAs } from '../../engine/types'
 import type { GameView } from '../../engine/view'
 import { CardFace, RoleBadge } from './components'
 import { useLocalController, useSecondsLeft, type GameController, type Social } from './controller'
@@ -12,10 +14,19 @@ import { ChatPanel, VoiceControls } from './social'
 import { GUN } from '../three/gunTiming'
 import { useGameSounds, useSoundOn } from './useGameSounds'
 
+// 依目前語言的名稱
+const L = () => getLang()
+const cN = (k: CardKey) => cardName(k, L())
+const cD = (k: CardKey) => cardDesc(k, L())
+const gN = (k: GoldKey) => goldName(k, L())
+const gD = (k: GoldKey) => goldDesc(k, L())
+const chN = (id: string) => charName(id, L())
+const chT = (id: string) => charText(id, L())
+
 // 3D 場景比較大，進牌桌時才載入
 const TableScene = lazy(() => import('../three/TableScene').then((m) => ({ default: m.TableScene })))
 
-const playName = (as: PlayAs) => enginePlayName(as)
+const playName = (as: PlayAs) => enginePlayName(as, L())
 
 export function LocalGame({ config, onExit }: { config: GameConfig; onExit: () => void }) {
   const ctl = useLocalController(config)
@@ -26,7 +37,7 @@ export function LocalGame({ config, onExit }: { config: GameConfig; onExit: () =
       historyId={`local-${config.seed}`}
       resultActions={
         <button type="button" className="primary" onClick={onExit}>
-          回到大廳
+          {t('回到大廳', 'Back to lobby')}
         </button>
       }
     />
@@ -37,7 +48,7 @@ export function GameScreen({
   ctl,
   social,
   onExit,
-  exitLabel = '離開',
+  exitLabel,
   resultActions,
   historyId,
   topExtra,
@@ -85,7 +96,7 @@ function Table({
   ctl: GameController
   social?: Social
   onExit: () => void
-  exitLabel: string
+  exitLabel?: string
   resultActions: ReactNode
   topExtra?: ReactNode
 }) {
@@ -126,12 +137,12 @@ function Table({
   const [soundOn, setSoundOn] = useSoundOn()
   const hurt = useHurtFlash(v)
   const me = v.players[v.me]
-  const myChar = me.character ? CHAR_BY_ID[me.character] : null
+  const myChar = me.character
   const d = v.decision
 
   useEffect(() => {
     const base = 'BANG!'
-    document.title = v.result ? base : d?.type === 'play' ? '● 輪到你了｜BANG!' : d ? '● 需要你回應｜BANG!' : base
+    document.title = v.result ? base : d?.type === 'play' ? t('● 輪到你了｜BANG!', '● Your turn | BANG!') : d ? t('● 需要你回應｜BANG!', '● Your move | BANG!') : base
     return () => {
       document.title = base
     }
@@ -220,47 +231,50 @@ function Table({
       <header className="topbar">
         <span className="brand">BANG!</span>
         <span className="turn">
-          第 {v.turnNo} 回合
-          <b className={v.active === v.me ? 'turn-me' : ''}>{v.active === v.me ? '你的回合' : `${v.players[v.active].name} 的回合`}</b>
+          {t(`第 ${v.turnNo} 回合`, `Turn ${v.turnNo}`)}
+          <b className={v.active === v.me ? 'turn-me' : ''}>{v.active === v.me ? t('你的回合', 'Your turn') : t(`${v.players[v.active].name} 的回合`, `${v.players[v.active].name}’s turn`)}</b>
         </span>
         {social && <VoiceControls voice={social.voice} speakers={social.room.members.filter((m) => m.inVoice).length} />}
         {topExtra}
         <button type="button" className="ghost sound-btn" onClick={() => setSoundOn(!soundOn)} aria-pressed={soundOn}>
-          {soundOn ? '音效 開' : '音效 關'}
+          {soundOn ? t('音效 開', 'Sound on') : t('音效 關', 'Sound off')}
         </button>
         <button type="button" className="ghost" onClick={() => setInspect(v.me)}>
-          角色能力
+          {t('角色能力', 'Abilities')}
         </button>
         <DocsButtons />
+        <LangToggle />
         <button type="button" className="ghost side-toggle" onClick={() => setSideOpen((o) => !o)} aria-expanded={sideOpen}>
-          {sideOpen ? '收起' : '紀錄與聊天'}
+          {sideOpen ? t('收起', 'Hide') : t('紀錄與聊天', 'Log & chat')}
           {unread > 0 && <span className="badge">{unread}</span>}
         </button>
         <button type="button" className="ghost" onClick={onExit}>
-          {exitLabel}
+          {exitLabel ?? t('離開', 'Leave')}
         </button>
       </header>
 
       <div className="layout">
-        <section className={`stage ${hurt ? 'is-hurt' : ''}`} aria-label="牌桌（可拖曳轉動視角）">
-          <Suspense fallback={<div className="stage-loading">酒館佈置中…</div>}>
+        <section className={`stage ${hurt ? 'is-hurt' : ''}`} aria-label={t('牌桌（可拖曳轉動視角）', 'Table (drag to look around)')}>
+          <Suspense fallback={<div className="stage-loading">{t('酒館佈置中…', 'Setting up the saloon…')}</div>}>
             <TableScene v={v} waitingOn={ctl.waitingOn} aiControlled={ctl.aiControlled} mode={viewMode} selected={sel} />
           </Suspense>
           <div className="stage-hud">
             <EventBanner v={v} />
             <MyStatus v={v} />
             <p className="stage-piles">
-              牌堆 {v.deckCount}．{v.dir === -1 ? '逆時針．' : ''}拖曳可{viewMode === 'first' ? '轉頭' : '旋轉視角'}
+              {t(`牌堆 ${v.deckCount}．`, `Deck ${v.deckCount} · `)}
+              {v.dir === -1 ? t('逆時針．', 'anticlockwise · ') : ''}
+              {viewMode === 'first' ? t('拖曳可轉頭', 'drag to turn your head') : t('拖曳可旋轉視角', 'drag to rotate')}
             </p>
           </div>
           {me.alive && me.table.some((c) => c.key === 'jail') && (
-            <div className="jail-bars" aria-label="你被關在監獄裡">
-              <span>你被關進監獄了！回合開始時抽判定：紅心才能越獄</span>
+            <div className="jail-bars" aria-label={t('你被關在監獄裡', 'You are in Jail')}>
+              <span>{t('你被關進監獄了！回合開始時抽判定：紅心才能越獄', 'You are in Jail! At the start of your turn draw!: only a Heart lets you out')}</span>
             </div>
           )}
           <div className="stage-view">
             <button type="button" onClick={toggleView} aria-pressed={viewMode === 'overview'}>
-              {viewMode === 'first' ? '切換到俯瞰視角' : '切換到第一人稱'}
+              {viewMode === 'first' ? t('切換到俯瞰視角', 'Overhead view') : t('切換到第一人稱', 'First-person view')}
             </button>
           </div>
         </section>
@@ -269,19 +283,30 @@ function Table({
           <div className="me-card">
             <div className="me-row">
               {me.role && <RoleBadge role={me.role} />}
-              <b>{myChar?.name ?? '—'}</b>
+              <b>{myChar ? chN(myChar) : '—'}</b>
             </div>
-            {me.role && <p className="me-mission">勝利條件：{ROLE_GOAL[me.role]}</p>}
-            {myChar && <p className="me-mission">角色能力：{myChar.text}</p>}
+            {me.role && (
+              <p className="me-mission">
+                {t('勝利條件：', 'Goal: ')}
+                {roleGoal(me.role, L())}
+              </p>
+            )}
+            {myChar && (
+              <p className="me-mission">
+                {t('角色能力：', 'Ability: ')}
+                {chT(myChar)}
+              </p>
+            )}
           </div>
           <Roster v={v} />
           {social && (
             <div className="tabs" role="tablist">
               <button type="button" role="tab" aria-selected={tab === 'log'} className={tab === 'log' ? 'on' : ''} onClick={() => setTab('log')}>
-                遊戲紀錄
+                {t('遊戲紀錄', 'Log')}
               </button>
               <button type="button" role="tab" aria-selected={tab === 'chat'} className={tab === 'chat' ? 'on' : ''} onClick={() => setTab('chat')}>
-                聊天{unread > 0 && <span className="badge">{unread}</span>}
+                {t('聊天', 'Chat')}
+                {unread > 0 && <span className="badge">{unread}</span>}
               </button>
             </div>
           )}
@@ -290,7 +315,7 @@ function Table({
       </div>
 
       {inspect != null && <PlayersPanel v={v} focus={inspect} onClose={() => setInspect(null)} />}
-      <section className={`bench ${d ? 'is-my-move' : ''}`} aria-label="你的手牌與行動">
+      <section className={`bench ${d ? 'is-my-move' : ''}`} aria-label={t('你的手牌與行動', 'Your hand and actions')}>
         <Prompt
           v={v}
           ctl={ctl}
@@ -309,8 +334,8 @@ function Table({
           touch={touch}
           openCard={playOrOpen}
         />
-        <div className="hand" role="group" aria-label="手牌">
-          {v.hand.length === 0 && <span className="muted">沒有手牌</span>}
+        <div className="hand" role="group" aria-label={t('手牌', 'Hand')}>
+          {v.hand.length === 0 && <span className="muted">{t('沒有手牌', 'No cards in hand')}</span>}
           {v.hand.map((c) => (
             <CardFace
               key={c.id}
@@ -344,7 +369,7 @@ function Table({
       )}
       {ctl.error && (
         <div className="toast" role="alert" onClick={ctl.clearError}>
-          {ctl.error}
+          {tx(ctl.error)}
         </div>
       )}
       {v.result && <Result v={v} actions={resultActions} history={history} />}
@@ -383,19 +408,18 @@ function useHurtFlash(v: GameView) {
 
 function EventBanner({ v }: { v: GameView }) {
   if (!v.event && !v.eventsLeft) return null
-  const ev = v.event ? EVENT_BY_ID[v.event] : null
   return (
     <div className="event-banner">
-      <span className="event-tag">事件</span>
-      {ev ? (
+      <span className="event-tag">{t('事件', 'Event')}</span>
+      {v.event ? (
         <>
-          <b>{ev.name}</b>
-          <span>{ev.text}</span>
+          <b>{eventName(v.event, L())}</b>
+          <span>{eventText(v.event, L())}</span>
         </>
       ) : (
-        <span>警長第二回合開始翻開第一張事件牌。</span>
+        <span>{t('警長第二回合開始翻開第一張事件牌。', 'The first event is revealed at the start of the Sheriff’s second turn.')}</span>
       )}
-      <small>剩 {v.eventsLeft} 張</small>
+      <small>{t(`剩 ${v.eventsLeft} 張`, `${v.eventsLeft} left`)}</small>
     </div>
   )
 }
@@ -404,18 +428,19 @@ function MyStatus({ v }: { v: GameView }) {
   const me = v.players[v.me]
   return (
     <div className="mystatus">
-      <div className="plate-hp" aria-label={`你的生命 ${me.hp} / ${me.maxHp}`}>
-        <span className="hp-label">生命</span>
+      <div className="plate-hp" aria-label={t(`你的生命 ${me.hp} / ${me.maxHp}`, `Your life ${me.hp} / ${me.maxHp}`)}>
+        <span className="hp-label">{t('生命', 'Life')}</span>
         {Array.from({ length: me.maxHp }, (_, i) => (
           <span key={i} className={i < me.hp ? 'bullet on' : 'bullet'} />
         ))}
       </div>
       <div className="mystatus-row">
-        射程 {v.myRange}
+        {t(`射程 ${v.myRange}`, `Range ${v.myRange}`)}
         {v.suit && (
           <span className="cuffs">
-            手銬：只能出{SUIT_SYMBOL[v.suit]}
-            {SUIT_NAME[v.suit]}
+            {t('手銬：只能出', 'Handcuffs: only ')}
+            {SUIT_SYMBOL[v.suit]}
+            {suitName(v.suit, L())}
           </span>
         )}
         {me.table.length > 0 && <Gear cards={me.table} fresh={v.fresh} />}
@@ -429,8 +454,8 @@ function Gear({ cards, fresh }: { cards: Card[]; fresh: number[] }) {
   return (
     <span className="plate-gear">
       {cards.map((c) => (
-        <span key={c.id} className={`gear g-${CARD_DEFS[c.key].colour} ${fresh.includes(c.id) ? 'is-fresh' : ''}`} title={CARD_DEFS[c.key].desc + (fresh.includes(c.id) ? '（下一回合起可用）' : '')}>
-          {CARD_DEFS[c.key].name}
+        <span key={c.id} className={`gear g-${CARD_DEFS[c.key].colour} ${fresh.includes(c.id) ? 'is-fresh' : ''}`} title={cD(c.key) + (fresh.includes(c.id) ? t('（下一回合起可用）', ' (usable from next turn)') : '')}>
+          {cN(c.key)}
         </span>
       ))}
     </span>
@@ -443,56 +468,56 @@ function PlayersPanel({ v, focus, onClose }: { v: GameView; focus: number; onClo
   useEffect(() => ref.current?.scrollIntoView({ block: 'nearest' }), [focus])
   return (
     <div className="sheet-backdrop" onClick={onClose}>
-      <div className="sheet players-panel" role="dialog" aria-label="角色能力與裝備" onClick={(e) => e.stopPropagation()}>
+      <div className="sheet players-panel" role="dialog" aria-label={t('角色能力與裝備', 'Abilities and equipment')} onClick={(e) => e.stopPropagation()}>
         <div className="sheet-head">
-          <b>角色能力與裝備</b>
-          <button type="button" className="sheet-close" onClick={onClose} aria-label="關閉">
+          <b>{t('角色能力與裝備', 'Abilities and equipment')}</b>
+          <button type="button" className="sheet-close" onClick={onClose} aria-label={t('關閉', 'Close')}>
             ✕
           </button>
         </div>
         <ul>
           {v.players.map((p) => {
-            const c = p.character ? CHAR_BY_ID[p.character] : null
+            const c = p.character
             const jailed = p.alive && p.table.some((x) => x.key === 'jail')
             return (
               <li key={p.seat} ref={p.seat === focus ? ref : undefined} className={`pp ${p.seat === focus ? 'is-focus' : ''} ${p.alive ? '' : 'is-out'}`}>
                 <div className="pp-head">
                   <b>{p.name}</b>
-                  {p.seat === v.me && <span className="seat-you">你</span>}
+                  {p.seat === v.me && <span className="seat-you">{t('你', 'You')}</span>}
                   {p.role && <RoleBadge role={p.role} />}
-                  {jailed && <span className="mark m-lock">監獄中</span>}
-                  {!p.alive && <span className="mark m-dead">{p.ghost ? '幽靈' : '死亡'}</span>}
+                  {jailed && <span className="mark m-lock">{t('監獄中', 'In Jail')}</span>}
+                  {!p.alive && <span className="mark m-dead">{p.ghost ? t('幽靈', 'Ghost') : t('死亡', 'Dead')}</span>}
                 </div>
                 <div className="pp-char">
-                  <b>{c?.name ?? '—'}</b>
-                  <span className="pp-hp" aria-label={`生命 ${p.hp}/${p.maxHp}`}>
+                  <b>{c ? chN(c) : '—'}</b>
+                  <span className="pp-hp" aria-label={t(`生命 ${p.hp}/${p.maxHp}`, `Life ${p.hp}/${p.maxHp}`)}>
                     {Array.from({ length: p.maxHp }, (_, i) => (
                       <span key={i} className={i < p.hp ? 'bullet on' : 'bullet'} />
                     ))}
                     <small>
                       {Math.max(0, p.hp)}/{p.maxHp}
-                      {p.role === 'sheriff' && c ? `（${c.hp}+1 警長）` : ''}
+                      {p.role === 'sheriff' && c ? t(`（${p.maxHp - 1}+1 警長）`, ` (${p.maxHp - 1}+1 Sheriff)`) : ''}
                     </small>
                   </span>
                 </div>
-                {c && <p className="pp-text">{c.text}</p>}
+                {c && <p className="pp-text">{chT(c)}</p>}
                 {p.table.length + p.gold.length > 0 ? (
                   <ul className="pp-gear">
                     {p.table.map((x) => (
                       <li key={x.id}>
-                        <span className={`gear g-${CARD_DEFS[x.key].colour}`}>{CARD_DEFS[x.key].name}</span>
-                        {CARD_DEFS[x.key].desc}
+                        <span className={`gear g-${CARD_DEFS[x.key].colour}`}>{cN(x.key)}</span>
+                        {cD(x.key)}
                       </li>
                     ))}
                     {p.gold.map((x) => (
                       <li key={x.uid}>
-                        <span className="gear g-gold">{GOLD_DEFS[x.key].name}</span>
-                        {GOLD_DEFS[x.key].desc}
+                        <span className="gear g-gold">{gN(x.key)}</span>
+                        {gD(x.key)}
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className="pp-none">沒有裝備</p>
+                  <p className="pp-none">{t('沒有裝備', 'No equipment')}</p>
                 )}
               </li>
             )
@@ -507,20 +532,20 @@ function PlayersPanel({ v, focus, onClose }: { v: GameView; focus: number; onClo
 function Roster({ v }: { v: GameView }) {
   return (
     <div className="roster">
-      <h3>牌桌上的人</h3>
+      <h3>{t('牌桌上的人', 'At the table')}</h3>
       <ul>
         {v.players.map((p) => (
           <li key={p.seat} className={`${p.alive ? '' : 'is-out'} ${p.seat === v.active ? 'is-active' : ''}`}>
             <span className="r-name">
               {p.name}
-              {p.seat === v.me && <span className="seat-you">你</span>}
+              {p.seat === v.me && <span className="seat-you">{t('你', 'You')}</span>}
             </span>
-            <span className="r-char">{p.character ? CHAR_BY_ID[p.character].name : ''}</span>
-            {p.character && <span className="r-ability">{CHAR_BY_ID[p.character].text}</span>}
+            <span className="r-char">{p.character ? chN(p.character) : ''}</span>
+            {p.character && <span className="r-ability">{chT(p.character)}</span>}
             {p.role && <RoleBadge role={p.role} />}
             <span className="r-hp">
-              {p.ghost ? '幽靈' : p.alive ? `♥ ${p.hp}/${p.maxHp}` : '已死亡'}
-              {p.alive && p.seat !== v.me && v.players[v.me].alive && <span className={`plate-dist ${p.dist <= v.myRange ? 'in-range' : ''}`}>距 {p.dist}</span>}
+              {p.ghost ? t('幽靈', 'Ghost') : p.alive ? `♥ ${p.hp}/${p.maxHp}` : t('已死亡', 'Dead')}
+              {p.alive && p.seat !== v.me && v.players[v.me].alive && <span className={`plate-dist ${p.dist <= v.myRange ? 'in-range' : ''}`}>{t(`距 ${p.dist}`, `dist ${p.dist}`)}</span>}
             </span>
             {(p.table.length > 0 || v.goldOn) && (
               <span className="r-gear">
@@ -536,12 +561,12 @@ function Roster({ v }: { v: GameView }) {
 }
 
 function describeOthers(v: GameView, waitingOn: number[]): string {
-  if (v.result) return '遊戲結束'
+  if (v.result) return t('遊戲結束', 'Game over')
   const who = waitingOn.filter((p) => p !== v.me)
-  if (who.length === 0) return '結算中…'
+  if (who.length === 0) return t('結算中…', 'Resolving…')
   const name = v.players[who[0]].name
-  if (who[0] === v.active) return `等待 ${name} 出牌…`
-  return `等待 ${name} 回應…`
+  if (who[0] === v.active) return t(`等待 ${name} 出牌…`, `Waiting for ${name} to play…`)
+  return t(`等待 ${name} 回應…`, `Waiting for ${name} to respond…`)
 }
 
 function Prompt({
@@ -595,8 +620,11 @@ function Prompt({
     return (
       <div className="prompt is-mine">
         <p className="prompt-text">
-          <span className="your-turn">代價</span>
-          使用【{playName(l.as)}】要另外棄 {l.cost} 張{l.costKind ? '「砰！」' : '手牌'}：點選下方的牌。
+          <span className="your-turn">{t('代價', 'Cost')}</span>
+          {t(
+            `使用【${playName(l.as)}】要另外棄 ${l.cost} 張${l.costKind ? '「砰！」' : '手牌'}：點選下方的牌。`,
+            `To play ${playName(l.as)} you must also discard ${l.cost} ${l.costKind ? 'BANG!' : `card${(l.cost ?? 1) > 1 ? 's' : ''}`}: tap them below.`,
+          )}
         </p>
         <div className="choices">
           <button
@@ -605,10 +633,10 @@ function Prompt({
             disabled={picked.length !== l.cost}
             onClick={() => act({ type: 'play', card: l.card, as: l.as, target: costFor.target, targetCard: costFor.targetCard, extra: picked })}
           >
-            確定（已選 {picked.length} 張）
+            {t(`確定（已選 ${picked.length} 張）`, `Confirm (${picked.length} selected)`)}
           </button>
           <button type="button" onClick={() => setCostFor(null)}>
-            取消
+            {t('取消', 'Cancel')}
           </button>
         </div>
       </div>
@@ -621,14 +649,14 @@ function Prompt({
     return (
       <div className="prompt is-mine">
         <p className="prompt-text">
-          <span className="your-turn">能力</span>
-          {ability.label}
-          {ability.cards > 0 ? `：點選下方 ${ability.cards} 張手牌。` : ''}
+          <span className="your-turn">{t('能力', 'Ability')}</span>
+          {tx(ability.label)}
+          {ability.cards > 0 ? t(`：點選下方 ${ability.cards} 張手牌。`, `: tap ${ability.cards} card${ability.cards > 1 ? 's' : ''} below.`) : ''}
         </p>
         <div className="choices">
           {ability.targets ? (
             <span className="choice-group">
-              <span className="choice-label">目標</span>
+              <span className="choice-label">{t('目標', 'Target')}</span>
               {ability.targets.map((q) => (
                 <button key={q} type="button" className="primary" disabled={!ready} onClick={() => act({ type: 'ability', ability: ability.id, cards: picked, target: q })}>
                   {v.players[q].name}
@@ -637,11 +665,11 @@ function Prompt({
             </span>
           ) : (
             <button type="button" className="primary" disabled={!ready} onClick={() => act({ type: 'ability', ability: ability.id, cards: picked })}>
-              確定
+              {t('確定', 'Confirm')}
             </button>
           )}
           <button type="button" onClick={() => setAbility(null)}>
-            取消
+            {t('取消', 'Cancel')}
           </button>
         </div>
       </div>
@@ -651,28 +679,28 @@ function Prompt({
   return (
     <div className={`prompt ${mine ? 'is-mine' : ''}`}>
       <p className="prompt-text">
-        {mine && <span className="your-turn">{d!.type === 'ask' ? d!.ask.title : '輪到你了'}</span>}
+        {mine && <span className="your-turn">{d!.type === 'ask' ? tx(d!.ask.title) : t('輪到你了', 'Your turn')}</span>}
         {!mine
           ? describeOthers(v, ctl.waitingOn)
           : d!.type === 'ask'
-            ? d!.ask.prompt
+            ? tx(d!.ask.prompt)
             : v.must != null
-              ? '西部法則：先打出亮出的那張牌（金框）。'
-              : '你的出牌階段：點一張手牌使用，打完按「結束回合」。'}
-        {left != null && <span className={`countdown ${left <= 5 ? 'is-urgent' : ''}`}>剩 {left} 秒</span>}
+              ? t('西部法則：先打出亮出的那張牌（金框）。', 'Law of the West: play the card you showed first (gold frame).')
+              : t('你的出牌階段：點一張手牌使用，打完按「結束回合」。', 'Your play phase: tap a card to use it, then press “End turn”.')}
+        {left != null && <span className={`countdown ${left <= 5 ? 'is-urgent' : ''}`}>{t(`剩 ${left} 秒`, `${left}s left`)}</span>}
       </p>
 
       {d?.type === 'ask' && <AskPanel v={v} ask={d.ask} picked={picked} setPicked={setPicked} act={act} />}
       {d?.type === 'play' && selCard && touch && (
         <div className="selected">
           <p className="sel-desc">
-            <b>【{CARD_DEFS[selCard.key].name}】</b>
-            {CARD_DEFS[selCard.key].desc}
+            <b>{t(`【${cN(selCard.key)}】`, `${cN(selCard.key)}: `)}</b>
+            {cD(selCard.key)}
           </p>
           <div className="choices">
             {legal.length ? (
               <button type="button" className="primary" onClick={() => openCard(selCard.id)}>
-                打出這張牌（或再點一下牌）
+                {t('打出這張牌（或再點一下牌）', 'Play this card (or tap it again)')}
               </button>
             ) : (
               <span className="muted">{whyNot(v, selCard)}</span>
@@ -683,8 +711,8 @@ function Prompt({
       {d?.type === 'play' && selCard && !touch && (
         <div className="selected">
           <p className="sel-desc">
-            <b>【{CARD_DEFS[selCard.key].name}】</b>
-            {CARD_DEFS[selCard.key].desc}
+            <b>{t(`【${cN(selCard.key)}】`, `${cN(selCard.key)}: `)}</b>
+            {cD(selCard.key)}
           </p>
           <div className="choices">
             {legal.map((l) => (
@@ -699,10 +727,10 @@ function Prompt({
         <div className="choices">
           {d?.type === 'play' && tableCards.length > 0 && (
             <span className="choice-group">
-              <span className="choice-label">場上的綠牌</span>
+              <span className="choice-label">{t('場上的綠牌', 'Green cards in play')}</span>
               {tableCards.map((c) => (
                 <button key={c.id} type="button" className={`gear-btn ${selCard?.id === c.id ? 'on' : ''}`} onClick={() => { setSelShop(null); setSel(selCard?.id === c.id ? null : c.id) }}>
-                  {CARD_DEFS[c.key].name}
+                  {cN(c.key)}
                 </button>
               ))}
             </span>
@@ -714,12 +742,12 @@ function Prompt({
               className="skill-btn"
               onClick={() => (ab.cards === 0 && !ab.targets ? act({ type: 'ability', ability: ab.id }) : setAbility(ab))}
             >
-              {ab.label}
+              {tx(ab.label)}
             </button>
           ))}
           {d?.type === 'play' && (
             <button type="button" className="end-turn" onClick={() => act({ type: 'end_turn' })}>
-              結束回合
+              {t('結束回合', 'End turn')}
             </button>
           )}
         </div>
@@ -729,22 +757,22 @@ function Prompt({
 }
 
 function whyNot(v: GameView, c: Card) {
-  if (v.suit && c.suit !== v.suit) return `手銬：這回合只能出${SUIT_NAME[v.suit]}。`
-  if (v.must != null && v.must !== c.id) return '西部法則：要先打出亮出的那張牌。'
+  if (v.suit && c.suit !== v.suit) return t(`手銬：這回合只能出${suitName(v.suit, 'zh')}。`, `Handcuffs: only ${suitName(v.suit, 'en')} this turn.`)
+  if (v.must != null && v.must !== c.id) return t('西部法則：要先打出亮出的那張牌。', 'Law of the West: play the card you showed first.')
   switch (c.key) {
     case 'missed':
     case 'dodge':
-      return '這張要在被開槍時才能用。'
+      return t('這張要在被開槍時才能用。', 'This one is played when you are shot.')
     case 'bang':
-      return v.event === 'sermon' ? '佈道：自己回合不能打「砰！」。' : v.bangsUsed > 0 ? '這回合已經開過槍了。' : '射程內沒有目標。'
+      return v.event === 'sermon' ? t('佈道：自己回合不能打「砰！」。', 'The Sermon: no BANG! on your own turn.') : v.bangsUsed > 0 ? t('這回合已經開過槍了。', 'You have already fired this turn.') : t('射程內沒有目標。', 'Nobody is in range.')
     case 'beer':
-      return v.event === 'reverend' ? '牧師：不能喝啤酒。' : v.players.filter((p) => p.alive).length <= 2 ? '只剩兩人時啤酒無效。' : '你的生命是滿的。'
+      return v.event === 'reverend' ? t('牧師：不能喝啤酒。', 'The Reverend: no Beer.') : v.players.filter((p) => p.alive).length <= 2 ? t('只剩兩人時啤酒無效。', 'Beer has no effect with two players left.') : t('你的生命是滿的。', 'Your life is full.')
     case 'panic':
-      return '距離 1 以內沒有可以搶的人。'
+      return t('距離 1 以內沒有可以搶的人。', 'Nobody to rob at distance 1.')
     default:
-      if (v.event === 'judge' && CARD_DEFS[c.key].colour !== 'brown') return '法官：不能把牌放到場上。'
-      if (CARD_DEFS[c.key].cost && v.hand.length < 2) return '這張牌要另外棄 1 張手牌，你手牌不夠。'
-      return CARD_DEFS[c.key].colour !== 'brown' ? (v.fresh.includes(c.id) ? '綠牌放上場的回合不能用。' : '你已經有同樣的牌了。') : '這張牌現在不能用。'
+      if (v.event === 'judge' && CARD_DEFS[c.key].colour !== 'brown') return t('法官：不能把牌放到場上。', 'The Judge: no cards may be put into play.')
+      if (CARD_DEFS[c.key].cost && v.hand.length < 2) return t('這張牌要另外棄 1 張手牌，你手牌不夠。', 'This card needs another card to discard, and you do not have one.')
+      return CARD_DEFS[c.key].colour !== 'brown' ? (v.fresh.includes(c.id) ? t('綠牌放上場的回合不能用。', 'A green card cannot be used the turn it comes into play.') : t('你已經有同樣的牌了。', 'You already have that card in play.')) : t('這張牌現在不能用。', 'This card cannot be played now.')
   }
 }
 
@@ -766,22 +794,25 @@ function PlayOptions({
   let label: string
   if (legal.source === 'shop') {
     const item = [...v.shop, ...(v.myFree ? [v.myFree] : []), ...v.players.flatMap((p) => p.gold)].find((x) => x.uid === legal.card)
-    const gname = item ? GOLD_DEFS[item.key].name : ''
+    const gname = item ? gN(item.key) : ''
     label =
       legal.as === 'golddrop'
-        ? `付 ${legal.price} 金塊棄掉【${gname}】`
-        : `${legal.price ? `花 ${legal.price} 金塊` : '免費'}${item && item.key !== legal.as ? `用【${gname}】當作【${name}】` : `買【${gname}】`}`
+        ? t(`付 ${legal.price} 金塊棄掉【${gname}】`, `Pay ${legal.price} nuggets to discard ${gname}`)
+        : t(
+            `${legal.price ? `花 ${legal.price} 金塊` : '免費'}${item && item.key !== legal.as ? `用【${gname}】當作【${name}】` : `買【${gname}】`}`,
+            `${item && item.key !== legal.as ? `Use ${gname} as ${name}` : `Buy ${gname}`} (${legal.price ? `${legal.price} nugget${legal.price > 1 ? 's' : ''}` : 'free'})`,
+          )
   } else {
     const card = (legal.source === 'table' ? me.table : v.hand).find((c) => c.id === legal.card)!
     const colour = CARD_DEFS[card.key].colour
     label =
       legal.source === 'table'
-        ? `使用場上的【${name}】`
+        ? t(`使用場上的【${name}】`, `Use ${name} in play`)
         : card.key !== legal.as
-          ? `把【${CARD_DEFS[card.key].name}】當作【${name}】`
+          ? t(`把【${cN(card.key)}】當作【${name}】`, `Play ${cN(card.key)} as ${name}`)
           : colour !== 'brown'
-            ? `${colour === 'green' ? '放到場上' : '裝備'}【${name}】`
-            : `使用【${name}】`
+            ? t(`${colour === 'green' ? '放到場上' : '裝備'}【${name}】`, `${colour === 'green' ? 'Put into play' : 'Equip'}: ${name}`)
+            : t(`使用【${name}】`, `Play ${name}`)
   }
   const go = (t?: number, tc?: number | 'hand', t2?: number) => (legal.cost ? onCost(t, tc) : onPlay({ type: 'play', card: legal.card, as: legal.as, target: t, targetCard: tc, target2: t2 }))
   // 連開：選完第一個目標，再選他旁邊的第二個
@@ -789,7 +820,7 @@ function PlayOptions({
     const opts = legal.second[first] ?? []
     return (
       <span className="choice-group">
-        <span className="choice-label">【連開】第二個目標（{v.players[first].name} 旁邊的人）</span>
+        <span className="choice-label">{t(`【連開】第二個目標（${v.players[first].name} 旁邊的人）`, `Fanning: second target (next to ${v.players[first].name})`)}</span>
         {opts.map((q) => (
           <button key={q} type="button" className="primary" onClick={() => go(first, undefined, q)}>
             {v.players[q].name}
@@ -797,11 +828,11 @@ function PlayOptions({
         ))}
         {!opts.length && (
           <button type="button" className="primary" onClick={() => go(first)}>
-            只打 {v.players[first].name}
+            {t(`只打 ${v.players[first].name}`, `Only ${v.players[first].name}`)}
           </button>
         )}
         <button type="button" onClick={() => setFirst(null)}>
-          換人
+          {t('換人', 'Change target')}
         </button>
       </span>
     )
@@ -810,29 +841,29 @@ function PlayOptions({
     return (
       <button type="button" className="primary" onClick={() => go()}>
         {label}
-        {legal.cost ? <small>另外棄 {legal.cost} 張</small> : null}
+        {legal.cost ? <small>{t(`另外棄 ${legal.cost} 張`, `+${legal.cost} discard`)}</small> : null}
       </button>
     )
   }
   if (legal.pickCard && target != null) {
-    const t = v.players[target]
+    const tg = v.players[target]
     return (
       <span className="choice-group">
         <span className="choice-label">
-          {label}：選 {t.name} 的哪一張
+          {t(`${label}：選 ${tg.name} 的哪一張`, `${label}: which of ${tg.name}’s cards?`)}
         </span>
-        {!legal.tableOnly && t.handCount > 0 && (
+        {!legal.tableOnly && tg.handCount > 0 && (
           <button type="button" className="primary" onClick={() => go(target, 'hand')}>
-            隨機一張手牌（{t.handCount} 張）
+            {t(`隨機一張手牌（${tg.handCount} 張）`, `A random card from hand (${tg.handCount})`)}
           </button>
         )}
-        {t.table.map((c) => (
+        {tg.table.map((c) => (
           <button key={c.id} type="button" className="primary" onClick={() => go(target, c.id)}>
-            場上的【{CARD_DEFS[c.key].name}】
+            {t(`場上的【${cN(c.key)}】`, `${cN(c.key)} in play`)}
           </button>
         ))}
         <button type="button" onClick={() => setTarget(null)}>
-          換人
+          {t('換人', 'Change target')}
         </button>
       </span>
     )
@@ -841,14 +872,15 @@ function PlayOptions({
     <span className="choice-group">
       <span className="choice-label">
         {label}
-        {legal.cost ? `（另外棄 ${legal.cost} 張）` : ''}，目標
+        {legal.cost ? t(`（另外棄 ${legal.cost} 張）`, ` (+${legal.cost} discard)`) : ''}
+        {t('，目標', ': target')}
       </span>
       {legal.targets.map((q) => {
         const p = v.players[q]
         return (
           <button key={q} type="button" className="primary" onClick={() => (legal.pickCard ? setTarget(q) : legal.second ? setFirst(q) : go(q))}>
-            {q === v.me ? '自己' : p.name}
-            <small>{!p.alive ? '已死亡' : q === v.me ? `♥${p.hp}` : `距離 ${p.dist}．♥${p.hp}`}</small>
+            {q === v.me ? t('自己', 'Yourself') : p.name}
+            <small>{!p.alive ? t('已死亡', 'Dead') : q === v.me ? `♥${p.hp}` : t(`距離 ${p.dist}．♥${p.hp}`, `dist ${p.dist} · ♥${p.hp}`)}</small>
           </button>
         )
       })}
@@ -857,10 +889,10 @@ function PlayOptions({
 }
 
 const TARGET_LABEL: Partial<Record<AskView['kind'], (name: string, n: number) => string>> = {
-  jesse: (name, n) => `從 ${name} 手上拿（${n} 張）`,
-  vera: (name) => `複製 ${name}`,
-  evelyn: (name) => `對 ${name} 開槍`,
-  blood: (name) => `給 ${name} 1 點生命`,
+  jesse: (name, n) => t(`從 ${name} 手上拿（${n} 張）`, `Take from ${name} (${n})`),
+  vera: (name) => t(`複製 ${name}`, `Copy ${name}`),
+  evelyn: (name) => t(`對 ${name} 開槍`, `Shoot ${name}`),
+  blood: (name) => t(`給 ${name} 1 點生命`, `Give ${name} 1 life`),
 }
 
 /** 需要回答的詢問 */
@@ -871,12 +903,12 @@ function AskPanel({ v, ask, picked, setPicked, act }: { v: GameView; ask: AskVie
       {ask.targets.map((q) => (
         <button key={q} type="button" className="primary" onClick={() => act({ type: 'answer', target: q })}>
           {(TARGET_LABEL[ask.kind] ?? ((n: string) => n))(v.players[q].name, v.players[q].handCount)}
-          {ask.kind === 'vera' && v.players[q].character && <small>{CHAR_BY_ID[v.players[q].character!].name}</small>}
+          {ask.kind === 'vera' && v.players[q].character && <small>{chN(v.players[q].character!)}</small>}
         </button>
       ))}
       {ask.table.map((c) => (
         <button key={c.id} type="button" className="primary" onClick={() => act({ type: 'answer', cards: [c.id] })}>
-          用場上的【{CARD_DEFS[c.key].name}】
+          {t(`用場上的【${cN(c.key)}】`, `Use ${cN(c.key)} in play`)}
         </button>
       ))}
       {ask.options.map((o) => (
@@ -887,7 +919,7 @@ function AskPanel({ v, ask, picked, setPicked, act }: { v: GameView; ask: AskVie
           disabled={ask.kind === 'bandidos' && o.id === 'ok' && picked.length !== ask.min}
           onClick={() => act({ type: 'answer', opt: o.id, cards: ask.kind === 'ranch' || ask.kind === 'bandidos' ? picked : undefined })}
         >
-          {o.label}
+          {tx(o.label)}
         </button>
       ))}
     </>
@@ -911,12 +943,12 @@ function AskPanel({ v, ask, picked, setPicked, act }: { v: GameView; ask: AskVie
         ))}
         {multi ? (
           <button type="button" className="primary" disabled={picked.length < ask.min || picked.length > ask.max} onClick={() => act({ type: 'answer', opt: 'ok', cards: picked })}>
-            {ask.min === ask.max ? `拿這 ${ask.min} 張` : `拿走選取的 ${picked.length} 張`}
+            {ask.min === ask.max ? t(`拿這 ${ask.min} 張`, `Take these ${ask.min}`) : t(`拿走選取的 ${picked.length} 張`, `Take the ${picked.length} selected`)}
           </button>
         ) : (
           ask.options.map((o) => (
             <button key={o.id} type="button" className={o.primary ? 'primary' : ''} onClick={() => act({ type: 'answer', opt: o.id })}>
-              {o.label}
+              {tx(o.label)}
             </button>
           ))
         )}
@@ -926,9 +958,9 @@ function AskPanel({ v, ask, picked, setPicked, act }: { v: GameView; ask: AskVie
   if (ask.kind === 'discard') {
     return (
       <div className="choices">
-        <span className="choice-label">點選下方手牌（{ask.min} 張）</span>
+        <span className="choice-label">{t(`點選下方手牌（${ask.min} 張）`, `Tap ${ask.min} card${ask.min > 1 ? 's' : ''} below`)}</span>
         <button type="button" className="primary" disabled={picked.length !== ask.min} onClick={() => act({ type: 'answer', opt: 'ok', cards: picked })}>
-          棄掉（已選 {picked.length} 張）
+          {t(`棄掉（已選 ${picked.length} 張）`, `Discard (${picked.length} selected)`)}
         </button>
       </div>
     )
@@ -937,7 +969,8 @@ function AskPanel({ v, ask, picked, setPicked, act }: { v: GameView; ask: AskVie
     return (
       <div className="choices">
         <span className="choice-label">
-          {ask.kind === 'ranch' ? '點選下方要換掉的手牌' : `點選下方 ${ask.min} 張要棄的手牌`}（已選 {picked.length} 張）
+          {ask.kind === 'ranch' ? t('點選下方要換掉的手牌', 'Tap the cards to swap') : t(`點選下方 ${ask.min} 張要棄的手牌`, `Tap ${ask.min} card${ask.min > 1 ? 's' : ''} to discard`)}
+          {t(`（已選 ${picked.length} 張）`, ` (${picked.length} selected)`)}
         </span>
         {buttons}
       </div>
@@ -945,7 +978,7 @@ function AskPanel({ v, ask, picked, setPicked, act }: { v: GameView; ask: AskVie
   }
   return (
     <div className="choices">
-      {ask.cards.some((id) => v.hand.some((c) => c.id === id)) && <span className="choice-label">點亮的手牌可以直接打出</span>}
+      {ask.cards.some((id) => v.hand.some((c) => c.id === id)) && <span className="choice-label">{t('點亮的手牌可以直接打出', 'Highlighted cards can be played directly')}</span>}
       {buttons}
     </div>
   )
@@ -968,13 +1001,13 @@ function Log({ v }: { v: GameView }) {
     if (el) el.scrollTop = el.scrollHeight
   }, [v.log.length])
   return (
-    <ol className="log" ref={ref} aria-label="遊戲紀錄" aria-live="polite">
+    <ol className="log" ref={ref} aria-label={t('遊戲紀錄', 'Game log')} aria-live="polite">
       {v.log.map((l) => (
         <li
           key={l.seq}
           className={logClass(l)}
         >
-          {l.text}
+          {tx(l.text)}
         </li>
       ))}
     </ol>
@@ -995,23 +1028,23 @@ function Result({ v, actions, history }: { v: GameView; actions: ReactNode; hist
   if (mode === 'hidden')
     return (
       <button type="button" className="primary result-reopen" onClick={() => setMode('summary')}>
-        看結算
+        {t('看結算', 'Show results')}
       </button>
     )
   if (mode === 'log')
     return (
-      <div className="overlay" role="dialog" aria-modal="true" aria-label="整局紀錄">
+      <div className="overlay" role="dialog" aria-modal="true" aria-label={t('整局紀錄', 'Full game log')}>
         <div className="result result-log">
           <div className="result-log-head">
-            <h2>整局紀錄</h2>
+            <h2>{t('整局紀錄', 'Full game log')}</h2>
             <button type="button" className="primary" onClick={() => setMode('summary')}>
-              回到結算
+              {t('回到結算', 'Back to results')}
             </button>
           </div>
           <ol className="log full-log">
             {history.map((l) => (
               <li key={l.seq} className={logClass(l)}>
-                {l.text}
+                {tx(l.text)}
               </li>
             ))}
           </ol>
@@ -1019,28 +1052,28 @@ function Result({ v, actions, history }: { v: GameView; actions: ReactNode; hist
       </div>
     )
   return (
-    <div className="overlay" role="dialog" aria-modal="true" aria-label="遊戲結果">
+    <div className="overlay" role="dialog" aria-modal="true" aria-label={t('遊戲結果', 'Results')}>
       <div className="result">
-        <h2>{won ? '你贏了' : '你輸了'}</h2>
-        <p>{r.reason}</p>
+        <h2>{won ? t('你贏了', 'You won') : t('你輸了', 'You lost')}</h2>
+        <p>{tx(r.reason)}</p>
         <table>
           <tbody>
             {v.players.map((p) => (
               <tr key={p.seat} className={r.winners.includes(p.seat) ? 'is-win' : ''}>
                 <td>{p.name}</td>
-                <td>{p.role ? ROLE_NAME[p.role] : ''}</td>
-                <td>{p.character ? CHAR_BY_ID[p.character].name : ''}</td>
-                <td>{r.winners.includes(p.seat) ? '勝利' : p.alive ? '' : '死亡'}</td>
+                <td>{p.role ? roleName(p.role, L()) : ''}</td>
+                <td>{p.character ? chN(p.character) : ''}</td>
+                <td>{r.winners.includes(p.seat) ? t('勝利', 'Won') : p.alive ? '' : t('死亡', 'Dead')}</td>
               </tr>
             ))}
           </tbody>
         </table>
         <div className="result-actions">
           <button type="button" onClick={() => setMode('log')}>
-            查看整局紀錄
+            {t('查看整局紀錄', 'Full game log')}
           </button>
           <button type="button" onClick={() => setMode('hidden')}>
-            看牌桌
+            {t('看牌桌', 'View table')}
           </button>
           {actions}
         </div>
@@ -1052,12 +1085,12 @@ function Result({ v, actions, history }: { v: GameView; actions: ReactNode; hist
 export function GoldInfo({ n, items }: { n: number; items: { uid: number; key: GoldKey }[] }) {
   return (
     <span className="gold-info">
-      <span className="nugget" title="金塊">
+      <span className="nugget" title={t('金塊', 'Gold nuggets')}>
         {n}
       </span>
       {items.map((x) => (
-        <span key={x.uid} className="gear g-gold" title={GOLD_DEFS[x.key].desc}>
-          {GOLD_DEFS[x.key].name}
+        <span key={x.uid} className="gear g-gold" title={gD(x.key)}>
+          {gN(x.key)}
         </span>
       ))}
     </span>
@@ -1073,7 +1106,8 @@ function ShopPanel({ v, selShop, setSelShop, act }: { v: GameView; selShop: numb
   return (
     <div className="shop">
       <span className="shop-title">
-        商店<small>你有 {v.myNuggets} 金塊．裝備牌堆 {v.goldDeck} 張</small>
+        {t('商店', 'Shop')}
+        <small>{t(`你有 ${v.myNuggets} 金塊．裝備牌堆 ${v.goldDeck} 張`, `You have ${v.myNuggets} nugget${v.myNuggets === 1 ? '' : 's'} · ${v.goldDeck} in the equipment deck`)}</small>
       </span>
       {items.map((x) => {
         const def = GOLD_DEFS[x.key]
@@ -1084,12 +1118,12 @@ function ShopPanel({ v, selShop, setSelShop, act }: { v: GameView; selShop: numb
             type="button"
             className={`shop-item k-${def.kind} ${selShop === x.uid ? 'on' : ''}`}
             disabled={!can}
-            title={def.desc}
+            title={gD(x.key)}
             onClick={() => setSelShop(selShop === x.uid ? null : x.uid)}
           >
-            <b>{def.name}</b>
-            <span className="price">{x.free ? '免費' : `${def.cost} 金`}</span>
-            <small>{def.desc}</small>
+            <b>{gN(x.key)}</b>
+            <span className="price">{x.free ? t('免費', 'Free') : t(`${def.cost} 金`, `${def.cost} gold`)}</span>
+            <small>{gD(x.key)}</small>
           </button>
         )
       })}
@@ -1102,7 +1136,7 @@ function ShopPanel({ v, selShop, setSelShop, act }: { v: GameView; selShop: numb
       )}
       {drops.length > 0 && (
         <details className="shop-drops">
-          <summary>付金塊棄掉別人的裝備</summary>
+          <summary>{t('付金塊棄掉別人的裝備', 'Pay nuggets to discard someone’s equipment')}</summary>
           <div className="choices">
             {drops.map((l) => (
               <PlayOptions key={l.card} legal={l} v={v} onPlay={act} onCost={() => {}} />
@@ -1133,12 +1167,12 @@ function PlaySheet({
   if (!card) return null
   return (
     <div className="sheet-backdrop" onClick={onClose}>
-      <div className="sheet" role="dialog" aria-modal="true" aria-label={`打出【${CARD_DEFS[card.key].name}】`} onClick={(e) => e.stopPropagation()}>
+      <div className="sheet" role="dialog" aria-modal="true" aria-label={t(`打出【${cN(card.key)}】`, `Play ${cN(card.key)}`)} onClick={(e) => e.stopPropagation()}>
         <div className="sheet-head">
           <CardFace card={card} small />
           <p>
-            <b>【{CARD_DEFS[card.key].name}】</b>
-            {CARD_DEFS[card.key].desc}
+            <b>{t(`【${cN(card.key)}】`, `${cN(card.key)}: `)}</b>
+            {cD(card.key)}
           </p>
         </div>
         <div className="choices sheet-choices">
@@ -1148,7 +1182,7 @@ function PlaySheet({
           {!legal.length && <span className="muted">{whyNot(v, card)}</span>}
         </div>
         <button type="button" className="sheet-close" onClick={onClose}>
-          取消
+          {t('取消', 'Cancel')}
         </button>
       </div>
     </div>

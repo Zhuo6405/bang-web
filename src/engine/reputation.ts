@@ -1,14 +1,8 @@
 import type { GameState } from './types'
 
 /**
- * 公開的「立場」推理（給 AI 用，只看大家都看得到的行為）
- *
- * 1. 每次有人「指定某人」做事，就記一筆互動：正數＝敵意，負數＝幫忙。
- * 2. 每個人的立場分數由互動推算：
- *    - 對「像警長方」的人出手 → 你像歹徒；對「像歹徒」的人出手 → 你像警長方。
- *    - 被「像警長方」的人打 → 你被懷疑；被「像歹徒」的人打 → 你像警長方。
- * 3. 已知身份（警長、死亡翻開的人）是定錨，事後翻開也會回頭重算。
- * 分數 > 0 像警長方（警長、副警長），< 0 像歹徒。
+ * 公開的互動紀錄：每次有人「指定某人」做事，就記一筆（正數＝敵意，負數＝幫忙）。
+ * 電腦玩家用這份紀錄猜身分（見 src/ai/mind.ts）。
  */
 
 /** 各種行為的敵意權重（負數＝幫忙） */
@@ -53,48 +47,10 @@ export const W = {
   kill: 1.5,
 } as const
 
-/** 被打的一方從攻擊者身上得到的線索比例 */
-const VICTIM_SHARE = 0.5
-
 /** 記一筆互動：a 對 b 做了權重 w 的事 */
 export function note(s: GameState, a: number | null | undefined, b: number, w: number) {
   if (a == null || a === b || !w) return
   const n = s.players.length
   if (!s.rel || s.rel.length !== n) s.rel = Array.from({ length: n }, () => Array(n).fill(0))
   s.rel[a][b] += w
-}
-
-/** 已經公開的身份：警長、死亡翻開的人 */
-function anchor(s: GameState, q: number): number | null {
-  const p = s.players[q]
-  if (p.role === 'sheriff') return 1
-  if (p.alive && !p.ghost) return null
-  if (p.role === 'deputy') return 1
-  if (p.role === 'outlaw') return -1
-  return -0.3 // 叛徒：兩邊都打
-}
-
-const clamp = (x: number) => Math.max(-1, Math.min(1, x))
-
-/** 每個人的立場分數（> 0 像警長方，< 0 像歹徒） */
-export function reputation(s: GameState): number[] {
-  const n = s.players.length
-  const rel = s.rel
-  let rep = Array(n).fill(0)
-  if (!rel || rel.length !== n) return rep
-  const fixed = s.players.map((_, q) => anchor(s, q))
-  // 反覆推算幾次，讓「誰打了誰」的線索傳遞出去
-  for (let it = 0; it < 4; it++) {
-    const stance = rep.map((r, q) => fixed[q] ?? clamp(r / 2))
-    const next = Array(n).fill(0)
-    for (let a = 0; a < n; a++)
-      for (let b = 0; b < n; b++) {
-        const w = rel[a][b]
-        if (!w) continue
-        next[a] += w * -stance[b]
-        next[b] += VICTIM_SHARE * w * -stance[a]
-      }
-    rep = next
-  }
-  return rep.map((x) => Math.round(x * 100) / 100)
 }

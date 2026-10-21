@@ -5,7 +5,9 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, type R
 import * as THREE from 'three'
 import { GUN, smooth } from './gunTiming'
 import { clampedPosition, keepVisible } from './plateClamp'
-import { CARD_DEFS, CHAR_BY_ID, EVENT_BY_ID, GOLD_DEFS, ROLE_NAME } from '../../engine/data'
+import { CARD_DEFS } from '../../engine/data'
+import { cardDesc, cardName, charName, eventName, eventText, goldDesc, goldName, roleName } from '../../engine/i18n'
+import { getLang, t as tr } from '../lang'
 import type { Card, Fx, GoldKey } from '../../engine/types'
 import type { GameView, PublicPlayer } from '../../engine/view'
 import { cardBackTexture, cardTexture, clearTextures, eventTexture, tagTexture, wordTexture } from './textures'
@@ -113,13 +115,13 @@ function apply(d: Director, f: Fx, t: number) {
         d.aims.set(f.from, { t0: t, shots: [{ target: f.to, at }], until: at + GUN.hold })
       }
       d.shots.push({ id: uid++, from: f.from, to: f.to, t0: at })
-      pop(f.from, '砰！', '#ffcf5a', at - t)
+      pop(f.from, tr('砰！', 'BANG!'), '#ffcf5a', at - t)
       return
     }
     case 'miss': {
       if (f.to == null) return
       const dt = afterShot(d, f, t)
-      pop(f.to, '射偏了！', '#cfe8ff', dt)
+      pop(f.to, tr('射偏了！', 'Missed!'), '#cfe8ff', dt)
       d.dodge.set(f.to, t + dt)
       return
     }
@@ -137,14 +139,14 @@ function apply(d: Director, f: Fx, t: number) {
       return
     case 'explode':
       if (f.to == null) return
-      pop(f.to, '轟！', '#ff8a2a')
+      pop(f.to, tr('轟！', 'BOOM!'), '#ff8a2a')
       d.flashes.push({ id: uid++, seat: f.to, kind: 'explode', t0: t })
       return
     case 'death':
-      if (f.to != null) pop(f.to, '倒下', '#d8d0c0')
+      if (f.to != null) pop(f.to, tr('倒下', 'Down'), '#d8d0c0')
       return
     case 'check':
-      if (f.to != null && f.card) pop(f.to, f.ok ? '判定成功' : '判定失敗', f.ok ? '#9fe0a0' : '#e0a09f')
+      if (f.to != null && f.card) pop(f.to, f.ok ? tr('判定成功', 'Draw! passed') : tr('判定失敗', 'Draw! failed'), f.ok ? '#9fe0a0' : '#e0a09f')
       return
   }
 }
@@ -397,7 +399,7 @@ function Table() {
 }
 
 function CardMesh({ card, w = 0.42, ...rest }: { card: Card | null; w?: number } & ThreeElements['mesh']) {
-  const tex = card ? cardTexture(card) : cardBackTexture()
+  const tex = card ? cardTexture(card, getLang()) : cardBackTexture()
   return (
     <mesh {...rest} receiveShadow>
       <planeGeometry args={[w, w * 1.4]} />
@@ -423,10 +425,10 @@ function Centre({ v }: { v: GameView }) {
         </mesh>
       </group>
       {v.discardTop && <CardMesh card={v.discardTop} w={0.5} position={[0.45, TABLE_Y + 0.02, -0.3]} rotation={[-Math.PI / 2, 0, 0.08]} />}
-      {v.event && EVENT_BY_ID[v.event] && (
+      {v.event && (
         <mesh position={[0, TABLE_Y + 0.025, -1.25]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
           <planeGeometry args={[0.9, 1.25]} />
-          <meshStandardMaterial map={eventTexture(EVENT_BY_ID[v.event].name, EVENT_BY_ID[v.event].text)} roughness={0.85} />
+          <meshStandardMaterial map={eventTexture(eventName(v.event, getLang()), eventText(v.event, getLang()), getLang())} roughness={0.85} />
         </mesh>
       )}
       {v.store.map((c, i) => (
@@ -815,10 +817,11 @@ function GearTag({ card, gold, y }: { card: Card | null; gold: GoldKey | null; y
   let bg = '#efe3c4'
   if (card) {
     const d = CARD_DEFS[card.key]
-    text = d.range ? `${d.name}．射程${d.range}` : d.name
+    const n = cardName(card.key, getLang())
+    text = d.range ? tr(`${n}．射程${d.range}`, `${n} · range ${d.range}`) : n
     bg = card.key === 'jail' ? '#b9b9b9' : card.key === 'dynamite' ? '#f08a6a' : d.colour === 'green' ? '#a9dc8f' : d.range ? '#f2c75c' : '#a9c9f2'
   } else if (gold) {
-    text = GOLD_DEFS[gold].name
+    text = goldName(gold, getLang())
     bg = '#f0d77a'
   }
   const tex = tagTexture(text, bg)
@@ -988,7 +991,7 @@ function JailCage({ theta }: { theta: number }) {
   })
   const bars = 14
   const R = 0.78
-  const tex = tagTexture('監獄', '#b9b9b9')
+  const tex = tagTexture(tr('監獄', 'JAIL'), '#b9b9b9')
   return (
     <group position={pos}>
       <group ref={g}>
@@ -1042,17 +1045,17 @@ function Seat({
     const m = ring.current.material as THREE.MeshStandardMaterial
     m.emissiveIntensity = reduced ? 1.2 : 0.9 + Math.sin(clock.elapsedTime * 4) * 0.5
   })
-  const ch = p.character ? CHAR_BY_ID[p.character] : null
+  const ch = p.character ? charName(p.character, getLang()) : null
   const jailed = p.alive && p.table.some((c) => c.key === 'jail')
   const winner = !!v.result?.winners.includes(p.seat)
   const marks: { text: string; cls: string }[] = []
-  if (dead) marks.push({ text: '死亡', cls: 'm-dead' })
-  if (p.ghost) marks.push({ text: '幽靈', cls: 'm-ai' })
-  if (v.active === p.seat && p.alive) marks.push({ text: '回合中', cls: 'm-turn' })
-  if (p.table.some((c) => c.key === 'jail')) marks.push({ text: '監獄', cls: 'm-lock' })
-  if (p.table.some((c) => c.key === 'dynamite')) marks.push({ text: '炸藥', cls: 'm-divert' })
-  if (acting) marks.push({ text: '行動中', cls: 'm-wait' })
-  if (aiControlled && p.alive) marks.push({ text: '斷線．AI 代打', cls: 'm-ai' })
+  if (dead) marks.push({ text: tr('死亡', 'Dead'), cls: 'm-dead' })
+  if (p.ghost) marks.push({ text: tr('幽靈', 'Ghost'), cls: 'm-ai' })
+  if (v.active === p.seat && p.alive) marks.push({ text: tr('回合中', 'Their turn'), cls: 'm-turn' })
+  if (p.table.some((c) => c.key === 'jail')) marks.push({ text: tr('監獄', 'Jail'), cls: 'm-lock' })
+  if (p.table.some((c) => c.key === 'dynamite')) marks.push({ text: tr('炸藥', 'Dynamite'), cls: 'm-divert' })
+  if (acting) marks.push({ text: tr('行動中', 'Acting'), cls: 'm-wait' })
+  if (aiControlled && p.alive) marks.push({ text: tr('斷線．AI 代打', 'Offline · computer playing'), cls: 'm-ai' })
   return (
     <group>
       <group position={pos} rotation-y={theta + Math.PI}>
@@ -1076,7 +1079,7 @@ function Seat({
           className={`plate ${me ? 'is-me' : ''} ${acting ? 'is-acting' : ''} ${dead ? 'is-out' : ''} ${winner ? 'is-winner' : ''}`}
           zIndexRange={[20, 0]}
         >
-          <PlateBody p={p} v={v} me={me} ch={ch?.name ?? null} marks={marks} />
+          <PlateBody p={p} v={v} me={me} ch={ch} marks={marks} />
         </Html>
       )}
     </group>
@@ -1088,26 +1091,26 @@ export function PlateBody({ p, v, me, ch, marks }: { p: PublicPlayer; v: GameVie
     <>
       <div className="plate-head">
         <b>{p.name}</b>
-        {me && <span className="seat-you">你</span>}
-        {p.isAI && <span className="seat-ai">電腦</span>}
-        <span className="plate-hand">手牌 {p.handCount}</span>
+        {me && <span className="seat-you">{tr('你', 'You')}</span>}
+        {p.isAI && <span className="seat-ai">{tr('電腦', 'CPU')}</span>}
+        <span className="plate-hand">{tr(`手牌 ${p.handCount}`, `Cards ${p.handCount}`)}</span>
       </div>
-      <div className="plate-char" onClick={() => window.dispatchEvent(new CustomEvent('bang-inspect', { detail: p.seat }))} title="點一下看角色能力與裝備">
-        {ch ?? '挑選角色中'}
-        {ch && <span className="plate-info">能力</span>}
-        {p.role && <span className={`role r-${p.role}`}>{ROLE_NAME[p.role]}</span>}
+      <div className="plate-char" onClick={() => window.dispatchEvent(new CustomEvent('bang-inspect', { detail: p.seat }))} title={tr('點一下看角色能力與裝備', 'Tap to see abilities and equipment')}>
+        {ch ?? tr('挑選角色中', 'Choosing a character')}
+        {ch && <span className="plate-info">{tr('能力', 'Info')}</span>}
+        {p.role && <span className={`role r-${p.role}`}>{roleName(p.role, getLang())}</span>}
       </div>
-      <div className="plate-hp" aria-label={`生命 ${p.hp} / ${p.maxHp}`}>
+      <div className="plate-hp" aria-label={tr(`生命 ${p.hp} / ${p.maxHp}`, `Life ${p.hp} / ${p.maxHp}`)}>
         {Array.from({ length: p.maxHp }, (_, i) => (
           <span key={i} className={i < p.hp ? 'bullet on' : 'bullet'} />
         ))}
-        {!me && p.alive && v.players[v.me].alive && p.dist > 0 && <span className={`plate-dist ${p.dist <= v.myRange ? 'in-range' : ''}`}>距離 {p.dist}</span>}
+        {!me && p.alive && v.players[v.me].alive && p.dist > 0 && <span className={`plate-dist ${p.dist <= v.myRange ? 'in-range' : ''}`}>{tr(`距離 ${p.dist}`, `Dist ${p.dist}`)}</span>}
       </div>
       {p.table.length > 0 && (
         <div className="plate-gear">
           {p.table.map((c) => (
-            <span key={c.id} className={`gear g-${CARD_DEFS[c.key].colour} ${v.fresh.includes(c.id) ? 'is-fresh' : ''}`} title={CARD_DEFS[c.key].desc}>
-              {CARD_DEFS[c.key].name}
+            <span key={c.id} className={`gear g-${CARD_DEFS[c.key].colour} ${v.fresh.includes(c.id) ? 'is-fresh' : ''}`} title={cardDesc(c.key, getLang())}>
+              {cardName(c.key, getLang())}
             </span>
           ))}
         </div>
@@ -1116,15 +1119,15 @@ export function PlateBody({ p, v, me, ch, marks }: { p: PublicPlayer; v: GameVie
         <div className="plate-gear">
           <span className="nugget">{p.nuggets}</span>
           {p.gold.map((x) => (
-            <span key={x.uid} className="gear g-gold" title={GOLD_DEFS[x.key].desc}>
-              {GOLD_DEFS[x.key].name}
+            <span key={x.uid} className="gear g-gold" title={goldDesc(x.key, getLang())}>
+              {goldName(x.key, getLang())}
             </span>
           ))}
         </div>
       )}
       {p.openHand && (
-        <div className="plate-open" title="薩卡加維亞：手牌公開">
-          {p.openHand.map((c) => CARD_DEFS[c.key].name).join('、') || '沒有手牌'}
+        <div className="plate-open" title={tr('薩卡加維亞：手牌公開', 'Sacagaway: hand revealed')}>
+          {p.openHand.map((c) => cardName(c.key, getLang())).join(tr('、', ', ')) || tr('沒有手牌', 'No cards')}
         </div>
       )}
       {marks.length > 0 && (
@@ -1201,7 +1204,7 @@ function MyHand({ v, selected }: { v: GameView; selected: number | null }) {
             <group key={c.id} rotation-z={-a} position={[0, 0, i * 0.004]}>
               <mesh position={[0, 0.15 + up, 0]}>
                 <planeGeometry args={[0.13, 0.185]} />
-                <meshStandardMaterial map={cardTexture(c)} side={THREE.DoubleSide} roughness={0.8} />
+                <meshStandardMaterial map={cardTexture(c, getLang())} side={THREE.DoubleSide} roughness={0.8} />
               </mesh>
             </group>
           )

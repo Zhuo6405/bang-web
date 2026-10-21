@@ -1,3 +1,4 @@
+import { getLang, t } from '../lang'
 import type { Action } from '../../engine/types'
 import type { ChatMsg, GamePacket, RoomInfo, RoomSettings, ToClient, ToServer } from '../../shared/protocol'
 
@@ -95,7 +96,7 @@ export class RoomSession {
     if (this.left || this.status === 'closed') return
     this.status = 'reconnecting'
     this.lostAt ??= Date.now()
-    if (Date.now() - this.lostAt > GIVE_UP_MS) return this.fail('和伺服器的連線中斷了，請檢查網路後重新加入。')
+    if (Date.now() - this.lostAt > GIVE_UP_MS) return this.fail(t('和伺服器的連線中斷了，請檢查網路後重新加入。', 'Lost the connection to the server. Check your network and join again.'))
     const delay = Math.min(5000, 800 * 2 ** this.attempts++)
     clearTimeout(this.retry)
     this.retry = setTimeout(() => this.connect(), delay)
@@ -146,7 +147,7 @@ export class RoomSession {
   setVoice = (on: boolean) => this.send({ t: 'voice', on })
   rtc = (to: string, data: unknown) => this.send({ t: 'rtc', to, data })
   updateSettings = (patch: Partial<RoomSettings>) => this.send({ t: 'settings', patch })
-  start = () => this.send({ t: 'start' })
+  start = () => this.send({ t: 'start', lang: getLang() })
   backToRoom = () => this.send({ t: 'backToRoom' })
 
   clearError = () => {

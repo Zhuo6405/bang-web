@@ -141,6 +141,8 @@ export interface GameConfig {
   ai: boolean[]
   seed: number
   expansions: string[]
+  /** 電腦難度 */
+  aiLevel?: 'easy' | 'normal' | 'hard'
 }
 
 export type FxKind =

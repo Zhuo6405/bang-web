@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { buildCards } from './data'
+import { buildCards, CARD_DEFS, CHARACTERS, EVENTS } from './data'
+import { CARD_EN, CHAR_EN, EVENT_EN, SEP } from './i18n'
+import { decide } from '../ai/ai'
 import { applyAction, distance, getDecisions, legalPlays, startGame } from './engine'
 import { makeConfig, playOut } from './sim'
 import type { CardKey, GameState } from './types'
@@ -353,4 +355,35 @@ describe('AI 自動對戰', () => {
       }
     }
   }, 30_000)
+})
+
+describe('雙語', () => {
+  it('每張牌、每個角色、每張事件都有英文', () => {
+    for (const k of Object.keys(CARD_DEFS)) expect(CARD_EN[k as CardKey]?.name, k).toBeTruthy()
+    for (const c of CHARACTERS) expect(CHAR_EN[c.id]?.text, c.id).toBeTruthy()
+    for (const e of EVENTS) expect(EVENT_EN[e.id]?.text, e.id).toBeTruthy()
+  })
+  it('整局的紀錄、詢問、按鈕都同時有中文和英文', () => {
+    const all = ['dodge_city', 'high_noon', 'fistful', 'wild_west_show', 'gold_rush', 'valley_of_shadows']
+    const missing = new Set<string>()
+    for (let seed = 1; seed <= 12; seed++) {
+      let s = startGame(makeConfig(4 + (seed % 5), seed * 7, all))
+      const seen = new Set<number>()
+      for (let i = 0; i < 6000 && !s.result; i++) {
+        const d = getDecisions(s)[0]
+        const v = viewFor(s, d.player)
+        if (d.type === 'ask') {
+          for (const x of [d.ask.title, d.ask.prompt, ...d.ask.options.map((o) => o.label)]) if (x && !x.includes(SEP)) missing.add(x)
+        }
+        for (const a of v.abilities) if (!a.label.includes(SEP)) missing.add(a.label)
+        s = applyAction(s, d.player, decide(v))
+        for (const l of s.log) if (!seen.has(l.seq)) {
+          seen.add(l.seq)
+          if (!l.text.includes(SEP)) missing.add(l.text)
+        }
+      }
+      if (s.result) expect(s.result.reason.includes(SEP)).toBe(true)
+    }
+    expect([...missing].slice(0, 10)).toEqual([])
+  }, 60_000)
 })

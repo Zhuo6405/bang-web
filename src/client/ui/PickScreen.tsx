@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { CHAR_BY_ID, EXPANSIONS, ROLE_GOAL } from '../../engine/data'
+import { CHAR_BY_ID, EXPANSIONS } from '../../engine/data'
+import { charName, charText, expName, roleGoal } from '../../engine/i18n'
+import { getLang, t } from '../lang'
 import type { Action, CoinDuel } from '../../engine/types'
 import type { GameView } from '../../engine/view'
 import { play } from '../sound'
 import { RoleBadge } from './components'
 import { useSecondsLeft } from './controller'
 
-const SET_NAME: Record<string, string> = { base: '基本版', ...Object.fromEntries(EXPANSIONS.map((e) => [e.id, e.name])) }
+const cn = (id: string) => charName(id, getLang())
 const SET_ORDER = ['base', ...EXPANSIONS.map((e) => e.id)]
 
 /** 開局選角：所有可選角色攤開，看得到別人選了誰；撞角就擲硬幣 */
@@ -40,24 +42,29 @@ export function CharacterPick({ v, act, deadline }: { v: GameView; act: (a: Acti
 
   return (
     <main className="pick pick-free">
-      <h1>挑選你的角色</h1>
+      <h1>{t('挑選你的角色', 'Choose your character')}</h1>
       <p className="pick-sub">
-        你的身份是 <RoleBadge role={me.role!} />：{ROLE_GOAL[me.role!]}
-        {sheriff && sheriff.seat !== v.me && `　警長是 ${sheriff.name}。`}
-        {bonus > 0 && '　你是警長，生命 +1。'}
-        {left != null && <span className="countdown">剩 {left} 秒</span>}
+        {t('你的身份是', 'Your role:')} <RoleBadge role={me.role!} />
+        {t('：', ' — ')}
+        {roleGoal(me.role!, getLang())}
+        {sheriff && sheriff.seat !== v.me && t(`　警長是 ${sheriff.name}。`, `  The Sheriff is ${sheriff.name}.`)}
+        {bonus > 0 && t('　你是警長，生命 +1。', '  As Sheriff you get +1 life.')}
+        {left != null && <span className="countdown">{t(`剩 ${left} 秒`, `${left}s left`)}</span>}
       </p>
       <p className="pick-rule">
-        第 {pk.round} 輪．發光的角色代表有人選了。兩人選到同一個角色就擲硬幣，人頭的拿到；三人以上每人擲 3 枚，人頭最多的拿到。沒拿到的人從剩下的角色再選。
+        {t(
+          `第 ${pk.round} 輪．發光的角色代表有人選了。兩人選到同一個角色就擲硬幣，人頭的拿到；三人以上每人擲 3 枚，人頭最多的拿到。沒拿到的人從剩下的角色再選。`,
+          `Round ${pk.round}. Glowing characters have been picked by someone. If two players pick the same one they toss a coin and heads wins; with three or more, each tosses 3 coins and the most heads wins. Whoever misses out picks again from what is left.`,
+        )}
       </p>
 
-      <ul className="pick-status" aria-label="大家的選擇">
+      <ul className="pick-status" aria-label={t('大家的選擇', 'Everyone’s picks')}>
         {v.players.map((p) => {
           const c = p.character ?? pk.picks[p.seat]
           return (
             <li key={p.seat} className={p.character ? 'is-done' : pk.picks[p.seat] ? 'is-sent' : ''}>
-              <b>{p.seat === v.me ? '你' : p.name}</b>
-              <span>{p.character ? `定案：${CHAR_BY_ID[p.character].name}` : c ? `選了 ${CHAR_BY_ID[c].name}` : '挑選中…'}</span>
+              <b>{p.seat === v.me ? t('你', 'You') : p.name}</b>
+              <span>{p.character ? t(`定案：${cn(p.character)}`, `Got ${cn(p.character)}`) : c ? t(`選了 ${cn(c)}`, `Picked ${cn(c)}`) : t('挑選中…', 'Choosing…')}</span>
             </li>
           )
         })}
@@ -65,7 +72,7 @@ export function CharacterPick({ v, act, deadline }: { v: GameView; act: (a: Acti
 
       {groups.map((g) => (
         <section key={g.set} className="pick-group">
-          <h2>{SET_NAME[g.set] ?? g.set}</h2>
+          <h2>{expName(g.set, getLang())}</h2>
           <div className="pick-grid">
             {g.ids.map((id) => {
               const c = CHAR_BY_ID[id]
@@ -98,21 +105,21 @@ export function CharacterPick({ v, act, deadline }: { v: GameView; act: (a: Acti
                   }}
                 >
                   <span className="pc-head">
-                    <span className="pc-name">{c.name}</span>
-                    <span className="pc-hp" aria-label={`生命 ${c.hp + bonus}`}>
+                    <span className="pc-name">{cn(id)}</span>
+                    <span className="pc-hp" aria-label={t(`生命 ${c.hp + bonus}`, `Life ${c.hp + bonus}`)}>
                       {Array.from({ length: c.hp + bonus }, (_, i) => (
                         <span key={i} className={i >= c.hp ? 'bullet on extra' : 'bullet on'} />
                       ))}
                       <small>{c.hp}{bonus ? '+1' : ''}</small>
                     </span>
                   </span>
-                  <span className="pc-text">{c.text}</span>
+                  <span className="pc-text">{charText(id, getLang())}</span>
                   {(owner != null || pickers.length > 0) && (
                     <span className="pc-tags">
-                      {owner != null && <span className="pc-tag lock">{owner === v.me ? '你的角色' : `${v.players[owner].name} 已定案`}</span>}
+                      {owner != null && <span className="pc-tag lock">{owner === v.me ? t('你的角色', 'Yours') : t(`${v.players[owner].name} 已定案`, `Taken by ${v.players[owner].name}`)}</span>}
                       {pickers.map((p) => (
                         <span key={p.seat} className={`pc-tag ${p.seat === v.me ? 'me' : ''}`}>
-                          {p.seat === v.me ? '你選了' : `${p.name} 選了`}
+                          {p.seat === v.me ? t('你選了', 'Your pick') : t(`${p.name} 選了`, `${p.name} picked`)}
                         </span>
                       ))}
                     </span>
@@ -129,26 +136,30 @@ export function CharacterPick({ v, act, deadline }: { v: GameView; act: (a: Acti
           sel ? (
             <>
               <span>
-                <b>{CHAR_BY_ID[sel].name}</b>
-                {pickersOf(sel).length > 0 && `（已經有 ${pickersOf(sel).length} 人選了，會擲硬幣）`}
+                <b>{cn(sel)}</b>
+                {pickersOf(sel).length > 0 && t(`（已經有 ${pickersOf(sel).length} 人選了，會擲硬幣）`, ` (${pickersOf(sel).length} already picked it: coin toss)`)}
               </span>
               <button type="button" className="primary" onClick={confirm}>
-                選定這個角色
+                {t('選定這個角色', 'Choose this character')}
               </button>
             </>
           ) : (
-            <span>點一個角色看清楚，再按「選定」；也可以直接點兩下。</span>
+            <span>{t('點一個角色看清楚，再按「選定」；也可以直接點兩下。', 'Tap a character to look, then choose it — or just double-tap.')}</span>
           )
         ) : me.character ? (
           <span>
-            你拿到了 <b>{CHAR_BY_ID[me.character].name}</b>，等其他人選完…
+            {t('你拿到了 ', 'You got ')}
+            <b>{cn(me.character)}</b>
+            {t('，等其他人選完…', '. Waiting for the others…')}
           </span>
         ) : sent ? (
           <span>
-            已送出 <b>{CHAR_BY_ID[sent].name}</b>，等其他人選完…
+            {t('已送出 ', 'You picked ')}
+            <b>{cn(sent)}</b>
+            {t('，等其他人選完…', '. Waiting for the others…')}
           </span>
         ) : (
-          <span>等待中…</span>
+          <span>{t('等待中…', 'Waiting…')}</span>
         )}
       </div>
     </main>
@@ -235,14 +246,14 @@ export function DuelOverlay({ v }: { v: GameView }) {
   }, [shown])
   if (!duels) return null
   return (
-    <div className="duel-backdrop" role="dialog" aria-label="擲硬幣決定角色">
+    <div className="duel-backdrop" role="dialog" aria-label={t('擲硬幣決定角色', 'Coin toss for characters')}>
       <div className="duel">
-        <h2>撞角了！擲硬幣決定</h2>
+        <h2>{t('撞角了！擲硬幣決定', 'Clash! Toss a coin')}</h2>
         {duels.map((d, i) => (
           <Duel key={`${d.round}-${d.char}`} d={d} v={v} tl={lines[i]} />
         ))}
         <button type="button" className={done ? 'primary' : 'ghost'} onClick={close}>
-          {done ? '知道了，繼續' : '跳過動畫'}
+          {done ? t('知道了，繼續', 'Got it, continue') : t('跳過動畫', 'Skip animation')}
         </button>
       </div>
     </div>
@@ -250,12 +261,13 @@ export function DuelOverlay({ v }: { v: GameView }) {
 }
 
 function Duel({ d, v, tl }: { d: CoinDuel; v: GameView; tl: Timeline }) {
-  const name = CHAR_BY_ID[d.char].name
-  const who = (s: number) => (s === v.me ? '你' : v.players[s].name)
+  const name = cn(d.char)
+  const who = (s: number) => (s === v.me ? t('你', 'You') : v.players[s].name)
   return (
     <section className="duel-one" style={{ animationDelay: `${tl.rounds[0].flips[0].at - 0.5}s` }}>
       <h3>
-        【{name}】{d.seats.map(who).join(' vs ')}
+        {t(`【${name}】`, `${name}: `)}
+        {d.seats.map(who).join(' vs ')}
       </h3>
       {d.rounds.map((round, r) => {
         const step = tl.rounds[r]
@@ -265,16 +277,16 @@ function Duel({ d, v, tl }: { d: CoinDuel; v: GameView; tl: Timeline }) {
         const single = round[0].coins.length === 1
         const note = single
           ? top.length === 1
-            ? `${who(top[0].seat)} 擲出人頭！`
+            ? t(`${who(top[0].seat)} 擲出人頭！`, `${who(top[0].seat)} tossed heads!`)
             : best
-              ? '兩個都是人頭，重擲'
-              : '兩個都是反面，重擲'
+              ? t('兩個都是人頭，重擲', 'Both heads: toss again')
+              : t('兩個都是反面，重擲', 'Both tails: toss again')
           : top.length === 1
-            ? `${who(top[0].seat)} 人頭最多（${best} 個）！`
-            : `${top.map((f) => who(f.seat)).join('、')} 平手（${best} 個人頭），再擲`
+            ? t(`${who(top[0].seat)} 人頭最多（${best} 個）！`, `${who(top[0].seat)} has the most heads (${best})!`)
+            : t(`${top.map((f) => who(f.seat)).join('、')} 平手（${best} 個人頭），再擲`, `${top.map((f) => who(f.seat)).join(' and ')} tie (${best} heads): toss again`)
         return (
           <div key={r} className="duel-round" style={{ animationDelay: `${step.flips[0].at - 0.3}s` }}>
-            {d.rounds.length > 1 && <p className="duel-no">第 {r + 1} 次</p>}
+            {d.rounds.length > 1 && <p className="duel-no">{t(`第 ${r + 1} 次`, `Toss ${r + 1}`)}</p>}
             {step.flips.map((f, j) => {
               const h = heads[j]
               const last = r === d.rounds.length - 1
@@ -288,17 +300,17 @@ function Duel({ d, v, tl }: { d: CoinDuel; v: GameView; tl: Timeline }) {
                         key={i}
                         className="coin"
                         style={{ animationDelay: `${f.at + i * COIN_GAP}s`, ['--end' as string]: c ? '2160deg' : '2340deg' }}
-                        aria-label={c ? '人頭' : '反面'}
+                        aria-label={c ? t('人頭', 'Heads') : t('反面', 'Tails')}
                       >
-                        <span className="coin-face heads">人頭</span>
-                        <span className="coin-face tails">反面</span>
+                        <span className="coin-face heads">{t('人頭', 'Heads')}</span>
+                        <span className="coin-face tails">{t('反面', 'Tails')}</span>
                       </span>
                     ))}
                   </span>
                   <span className="duel-count" style={{ animationDelay: `${f.at + (f.coins.length - 1) * COIN_GAP + COIN}s` }}>
-                    {f.coins.length > 1 ? `${h} 個人頭` : h ? '人頭' : '反面'}
+                    {f.coins.length > 1 ? t(`${h} 個人頭`, `${h} head${h === 1 ? '' : 's'}`) : h ? t('人頭', 'Heads') : t('反面', 'Tails')}
                   </span>
-                  {last && <span className="duel-res">{f.seat === d.winner ? '拿到了！' : '沒選到'}</span>}
+                  {last && <span className="duel-res">{f.seat === d.winner ? t('拿到了！', 'Got it!') : t('沒選到', 'Missed out')}</span>}
                 </div>
               )
             })}
@@ -310,15 +322,16 @@ function Duel({ d, v, tl }: { d: CoinDuel; v: GameView; tl: Timeline }) {
       })}
       <div className="duel-win" style={{ animationDelay: `${tl.win}s` }}>
         <span>
-          <b>{who(d.winner)}</b> 拿到【{name}】
+          <b>{who(d.winner)}</b>
+          {t(` 拿到【${name}】`, ` ${d.winner === v.me ? 'get' : 'gets'} ${name}`)}
         </span>
         {d.seats.filter((s) => s !== d.winner).length > 0 && (
           <small>
             {d.seats
               .filter((s) => s !== d.winner)
               .map(who)
-              .join('、')}
-            沒選到，要從剩下的角色重選
+              .join(t('、', ' and '))}
+            {t('沒選到，要從剩下的角色重選', ' missed out and will pick again from the rest')}
           </small>
         )}
       </div>

@@ -1,3 +1,4 @@
+import { t } from '../lang'
 import type { RoomSession } from './session'
 
 type Signal = { sdp?: RTCSessionDescriptionInit; ice?: RTCIceCandidateInit }
@@ -70,7 +71,7 @@ export class VoiceMesh {
       this.sync(this.roster)
     } catch (e) {
       const name = (e as { name?: string }).name
-      this.error = name === 'NotAllowedError' ? '沒有取得麥克風權限，請在瀏覽器網址列允許使用麥克風。' : '找不到可用的麥克風。'
+      this.error = name === 'NotAllowedError' ? t('沒有取得麥克風權限，請在瀏覽器網址列允許使用麥克風。', 'Microphone access was denied. Allow the microphone from your browser’s address bar.') : t('找不到可用的麥克風。', 'No microphone found.')
     }
     this.emit()
   }

@@ -8,6 +8,8 @@ export interface RoomSettings {
   count: number
   /** 加入的擴充 */
   expansions: string[]
+  /** 電腦難度 */
+  aiLevel?: 'easy' | 'normal' | 'hard'
 }
 
 export interface Member {
@@ -48,7 +50,7 @@ export interface GamePacket {
 export type ToServer =
   | { t: 'hello'; clientId: string; name: string }
   | { t: 'settings'; patch: Partial<RoomSettings> }
-  | { t: 'start' }
+  | { t: 'start'; lang?: 'zh' | 'en' }
   | { t: 'backToRoom' }
   | { t: 'action'; action: Action }
   | { t: 'chat'; text: string }

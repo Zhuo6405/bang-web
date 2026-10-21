@@ -3437,3 +3437,26 @@ html.doc-open body {
 .doc td {
   overflow-wrap: normal;
 }
+
+/* 英文牌名比較長：字小一點、可以斷行 */
+html[lang='en-GB'] .card .card-name {
+  font-size: 15px;
+  letter-spacing: 0;
+  line-height: 1.12;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+}
+
+html[lang='en-GB'] .card.is-small .card-name {
+  font-size: 11px;
+}
+
+html[lang='en-GB'] .card-type {
+  font-size: 11px;
+}
+
+@media (max-width: 900px) {
+  html[lang='en-GB'] .card .card-name {
+    font-size: 12.5px;
+  }
+}

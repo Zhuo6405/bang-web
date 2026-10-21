@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
+import { t } from '../lang'
 
 const DocBody = lazy(() => import('./DocBody'))
 
@@ -23,18 +24,18 @@ export function DocsButtons() {
   return (
     <span className="docs-btns">
       <button type="button" className="ghost" onClick={() => setOpen('guide')}>
-        遊玩說明
+        {t('遊玩說明', 'How to play')}
       </button>
       <button type="button" className="ghost" onClick={() => setOpen('spec')}>
-        規格書
+        {t('規格書', 'Specification')}
       </button>
       {open && (
-        <div className="overlay doc-overlay" role="dialog" aria-modal="true" aria-label={open === 'guide' ? '遊玩說明' : '規格書'} onClick={() => setOpen(null)}>
+        <div className="overlay doc-overlay" role="dialog" aria-modal="true" aria-label={open === 'guide' ? t('遊玩說明', 'How to play') : t('規格書', 'Specification')} onClick={() => setOpen(null)}>
           <article className="doc" onClick={(e) => e.stopPropagation()}>
-            <button type="button" className="doc-close" onClick={() => setOpen(null)} aria-label="關閉">
-              關閉
+            <button type="button" className="doc-close" onClick={() => setOpen(null)} aria-label={t('關閉', 'Close')}>
+              {t('關閉', 'Close')}
             </button>
-            <Suspense fallback={<p>載入中…</p>}>
+            <Suspense fallback={<p>{t('載入中…', 'Loading…')}</p>}>
               <DocBody which={open} />
             </Suspense>
           </article>

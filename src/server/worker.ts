@@ -1,5 +1,6 @@
 import { DurableObject } from 'cloudflare:workers'
 import { AI_NAMES, EXPANSIONS, MAX_PLAYERS, maxPlayersFor, MIN_PLAYERS } from '../engine/data'
+import { AI_NAMES_EN, bi } from '../engine/i18n'
 import type { Action, GameConfig, GameState } from '../engine/types'
 import { viewFor } from '../engine/view'
 import {
@@ -124,7 +125,7 @@ export class Room extends DurableObject<Env> {
       }
     }
     if (!this.d) {
-      this.send(ws, { t: 'rejected', reason: '找不到這個房間，請確認邀請碼。' })
+      this.send(ws, { t: 'rejected', reason: bi('找不到這個房間，請確認邀請碼。', 'Room not found. Check the invite code.') })
       ws.close(4004, 'no room')
       return new Response(null, { status: 101, webSocket: client })
     }
@@ -217,7 +218,7 @@ export class Room extends DurableObject<Env> {
   private onMessage(ws: WebSocket, msg: ToServer) {
     if (!this.d || !msg || typeof msg !== 'object') return
     if (msg.t === 'ping') return this.send(ws, { t: 'pong' })
-    if (msg.t === 'hello') return this.onHello(ws, String(msg.clientId ?? '').slice(0, 40), String(msg.name ?? '').trim().slice(0, 12) || '玩家')
+    if (msg.t === 'hello') return this.onHello(ws, String(msg.clientId ?? '').slice(0, 40), String(msg.name ?? '').trim().slice(0, 12) || 'Player')
     const m = this.memberOf(ws)
     if (!m) return
     const d = this.d
@@ -227,7 +228,7 @@ export class Room extends DurableObject<Env> {
         if (isOwner && !d.started) this.updateSettings(msg.patch ?? {})
         break
       case 'start':
-        if (isOwner && !d.started) this.start()
+        if (isOwner && !d.started) this.start(msg.lang === 'en' ? 'en' : 'zh')
         break
       case 'backToRoom':
         if (isOwner && d.started && (!this.runner || this.runner.state.result)) this.backToRoom()
@@ -261,14 +262,14 @@ export class Room extends DurableObject<Env> {
       const wasOff = !m.connected
       m.connected = true
       stopTimer(this.grace.get(clientId))
-      if (wasOff && d.started) this.system(`${m.name} 重新連線。`)
+      if (wasOff && d.started) this.system(bi(`${m.name} 重新連線。`, `${m.name} is back.`))
     } else {
       if (d.started) {
-        this.send(ws, { t: 'rejected', reason: '這局已經開始了，等下一局再加入。' })
+        this.send(ws, { t: 'rejected', reason: bi('這局已經開始了，等下一局再加入。', 'This game has already started. Join the next one.') })
         return ws.close(4003, 'started')
       }
       if (d.members.length >= MAX_PLAYERS) {
-        this.send(ws, { t: 'rejected', reason: `房間已滿（最多 ${MAX_PLAYERS} 人）。` })
+        this.send(ws, { t: 'rejected', reason: bi(`房間已滿（最多 ${MAX_PLAYERS} 人）。`, `The room is full (at most ${MAX_PLAYERS} players).`) })
         return ws.close(4003, 'full')
       }
       let nm = name
@@ -277,7 +278,7 @@ export class Room extends DurableObject<Env> {
       d.members.push(m)
       if (!d.ownerId || !d.members.some((x) => x.clientId === d.ownerId)) d.ownerId = clientId
       if (d.settings.count < d.members.length) d.settings = { ...d.settings, count: Math.min(MAX_PLAYERS, d.members.length) }
-      this.system(`${nm} 加入房間。`)
+      this.system(bi(`${nm} 加入房間。`, `${nm} joined the room.`))
     }
     this.sockets.set(ws, clientId)
     this.send(ws, { t: 'chat', msgs: d.chat.slice(-100), replace: true })
@@ -300,16 +301,16 @@ export class Room extends DurableObject<Env> {
     if (!d.started) {
       d.members = d.members.filter((x) => x !== m)
       if (d.ownerId === id) d.ownerId = d.members[0]?.clientId ?? ''
-      this.system(`${m.name} 離開房間。`)
+      this.system(bi(`${m.name} 離開房間。`, `${m.name} left the room.`))
     } else if (m.seat != null) {
       const seat = m.seat
-      this.system(`${m.name} 斷線了，${GRACE_MS / 1000} 秒內沒回來會由 AI 代打。`)
+      this.system(bi(`${m.name} 斷線了，${GRACE_MS / 1000} 秒內沒回來會由 AI 代打。`, `${m.name} disconnected; the computer takes over if they are not back within ${GRACE_MS / 1000} seconds.`))
       this.grace.set(
         id,
         setTimeout(() => {
           if (!m.connected && this.runner) {
             this.runner.setHuman(seat, false)
-            this.system(`${m.name} 由 AI 代打中。`)
+            this.system(bi(`${m.name} 由 AI 代打中。`, `The computer is playing for ${m.name}.`))
           }
         }, GRACE_MS),
       )
@@ -336,13 +337,14 @@ export class Room extends DurableObject<Env> {
     next.expansions = Array.isArray(next.expansions) ? next.expansions.filter((x) => ok.has(x)) : []
     // 道奇城才能 8 人；人已經太多就自動加上道奇城
     if (d.members.length > maxPlayersFor(next.expansions)) next.expansions = [...next.expansions, 'dodge_city']
+    next.aiLevel = next.aiLevel === 'easy' || next.aiLevel === 'hard' ? next.aiLevel : 'normal'
     next.count = Math.max(MIN_PLAYERS, Math.min(maxPlayersFor(next.expansions), Math.max(Number(next.count) || MIN_PLAYERS, d.members.length)))
     d.settings = next
     this.broadcastRoom()
   }
 
   private system(text: string) {
-    this.pushChat({ id: crypto.randomUUID(), clientId: null, name: '系統', text, ts: Date.now(), system: true })
+    this.pushChat({ id: crypto.randomUUID(), clientId: null, name: bi('系統', 'System'), text, ts: Date.now(), system: true })
   }
 
   private pushChat(msg: ChatMsg) {
@@ -355,7 +357,7 @@ export class Room extends DurableObject<Env> {
 
   // ───────── 遊戲 ─────────
 
-  private start() {
+  private start(lang: 'zh' | 'en' = 'zh') {
     const d = this.d!
     const humans = d.members.filter((m) => m.connected)
     const n = Math.max(d.settings.count, humans.length)
@@ -368,7 +370,7 @@ export class Room extends DurableObject<Env> {
     }
     humans.forEach((m, i) => (m.seat = order[i]))
     const used = new Set(humans.map((m) => m.name))
-    const aiNames = AI_NAMES.filter((x) => !used.has(x)).sort(() => Math.random() - 0.5)
+    const aiNames = (lang === 'en' ? AI_NAMES_EN : AI_NAMES).filter((x) => !used.has(x)).sort(() => Math.random() - 0.5)
     const seatNames: string[] = Array(n).fill('')
     const ai: boolean[] = Array(n).fill(true)
     humans.forEach((m) => {
@@ -376,12 +378,13 @@ export class Room extends DurableObject<Env> {
       ai[m.seat!] = false
     })
     let k = 0
-    for (let i = 0; i < n; i++) if (!seatNames[i]) seatNames[i] = aiNames[k++] ?? `電腦${k}`
+    for (let i = 0; i < n; i++) if (!seatNames[i]) seatNames[i] = aiNames[k++] ?? (lang === 'en' ? `Bot ${k}` : `電腦${k}`)
     const config: GameConfig = {
       names: seatNames,
       ai,
       seed: (Math.random() * 2 ** 31) | 0,
       expansions: d.settings.expansions,
+      aiLevel: d.settings.aiLevel ?? 'normal',
     }
     d.config = config
     d.state = null
@@ -390,7 +393,7 @@ export class Room extends DurableObject<Env> {
     this.runner?.dispose()
     this.runner = null
     this.ensureRunner()
-    this.system(`遊戲開始！${n} 人局，${n - humans.length} 位電腦補位。`)
+    this.system(bi(`遊戲開始！${n} 人局，${n - humans.length} 位電腦補位。`, `Game on! ${n} players, ${n - humans.length} of them computers.`))
     this.broadcastRoom()
     this.pushGame()
   }

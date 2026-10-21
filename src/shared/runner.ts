@@ -1,5 +1,6 @@
 import { decide } from '../ai/ai'
 import { applyAction, getDecisions, RuleError, startGame } from '../engine/engine'
+import { bi } from '../engine/i18n'
 import type { Action, Decision, GameConfig, GameState } from '../engine/types'
 import { viewFor } from '../engine/view'
 
@@ -63,7 +64,7 @@ export class GameRunner {
 
   /** 真人送出動作；回傳錯誤訊息或 null */
   submit(seat: number, a: Action): string | null {
-    if (this.disposed) return '遊戲已結束'
+    if (this.disposed) return bi('遊戲已結束', 'The game is over')
     try {
       this.state = applyAction(this.state, seat, a)
     } catch (e) {

@@ -5,7 +5,8 @@ import { VoiceMesh } from '../net/voice'
 import { useStore, type GameController, type Social } from './controller'
 import { DocsButtons } from './Docs'
 import { GameScreen } from './Game'
-import { ExpansionPicker } from './Lobby'
+import { ExpansionPicker, LevelPicker } from './Lobby'
+import { LangToggle, t, tx } from '../lang'
 import { ChatPanel, VoiceControls } from './social'
 
 export function inviteLink(code: string) {
@@ -36,10 +37,10 @@ export function OnlineScreen({ session, onExit }: { session: RoomSession; onExit
     onExit()
   }
 
-  if (session.status === 'closed') return <Centered text={session.error ?? '連線已結束'} action={onExit} actionLabel="回到大廳" />
-  if (!room) return <Centered text={`正在連線到房間 ${session.code}…`} action={leave} actionLabel="取消" />
+  if (session.status === 'closed') return <Centered text={session.error ? tx(session.error) : t('連線已結束', 'The connection has ended')} action={onExit} actionLabel={t('回到大廳', 'Back to lobby')} />
+  if (!room) return <Centered text={t(`正在連線到房間 ${session.code}…`, `Connecting to room ${session.code}…`)} action={leave} actionLabel={t('取消', 'Cancel')} />
 
-  const banner = session.status === 'reconnecting' && <div className="banner">連線中斷，正在重新連線…</div>
+  const banner = session.status === 'reconnecting' && <div className="banner">{t('連線中斷，正在重新連線…', 'Connection lost, reconnecting…')}</div>
   const social: Social = { me: session.me, room, chat: session.chat, say: session.say, voice }
   const g = session.game
   if (g && room.started) {
@@ -59,24 +60,24 @@ export function OnlineScreen({ session, onExit }: { session: RoomSession; onExit
           ctl={ctl}
           social={social}
           onExit={leave}
-          exitLabel="離開房間"
+          exitLabel={t('離開房間', 'Leave room')}
           historyId={`online-${g.gameId}`}
-          topExtra={<span className="room-code">房號 {room.code}</span>}
+          topExtra={<span className="room-code">{t('房號', 'Room')} {room.code}</span>}
           resultActions={
             session.isOwner ? (
               <>
                 <button type="button" className="primary" onClick={session.backToRoom}>
-                  回到房間再來一局
+                  {t('回到房間再來一局', 'Back to the room for another game')}
                 </button>
                 <button type="button" onClick={leave}>
-                  離開房間
+                  {t('離開房間', 'Leave room')}
                 </button>
               </>
             ) : (
               <>
-                <span className="muted">等房主開新的一局…</span>
+                <span className="muted">{t('等房主開新的一局…', 'Waiting for the host to start a new game…')}</span>
                 <button type="button" onClick={leave}>
-                  離開房間
+                  {t('離開房間', 'Leave room')}
                 </button>
               </>
             )
@@ -107,7 +108,7 @@ function RoomView({ session, voice, onLeave }: { session: RoomSession; voice: Vo
       setCopied(true)
       setTimeout(() => setCopied(false), 1800)
     } catch {
-      prompt('複製這個連結傳給朋友：', inviteLink(room.code))
+      prompt(t('複製這個連結傳給朋友：', 'Copy this link and send it to your friends:'), inviteLink(room.code))
     }
   }
 
@@ -115,55 +116,56 @@ function RoomView({ session, voice, onLeave }: { session: RoomSession; voice: Vo
     <div className="room">
       <header className="topbar">
         <span className="brand">BANG!</span>
-        <span className="turn">房間</span>
+        <span className="turn">{t('房間', 'Room')}</span>
         <VoiceControls voice={voice} speakers={room.members.filter((m) => m.inVoice).length} />
         <DocsButtons />
+        <LangToggle />
         <button type="button" className="ghost" onClick={onLeave}>
-          離開房間
+          {t('離開房間', 'Leave room')}
         </button>
       </header>
 
       <div className="room-body">
         <section className="room-main">
           <div className="invite">
-            <span className="invite-label">邀請碼</span>
-            <span className="invite-code" aria-label={`邀請碼 ${room.code.split('').join(' ')}`}>
+            <span className="invite-label">{t('邀請碼', 'Invite code')}</span>
+            <span className="invite-code" aria-label={`${t('邀請碼', 'Invite code')} ${room.code.split('').join(' ')}`}>
               {room.code}
             </span>
             <button type="button" className="primary" onClick={() => void copy()}>
-              {copied ? '已複製連結' : '複製邀請連結'}
+              {copied ? t('已複製連結', 'Link copied') : t('複製邀請連結', 'Copy invite link')}
             </button>
-            <p className="muted">朋友打開連結、輸入名字就能加入，任何網路都可以。</p>
+            <p className="muted">{t('朋友打開連結、輸入名字就能加入，任何網路都可以。', 'Friends open the link and enter a name to join, from any network.')}</p>
           </div>
 
           <h2>
-            玩家（{humans} / {s.count}）
+            {t('玩家', 'Players')} ({humans} / {s.count})
           </h2>
           <ul className="members">
             {room.members.map((m) => (
               <li key={m.clientId} className={m.connected ? '' : 'is-off'}>
                 <span className="m-name">
                   {m.name}
-                  {m.clientId === session.me && <span className="seat-you">你</span>}
+                  {m.clientId === session.me && <span className="seat-you">{t('你', 'You')}</span>}
                 </span>
-                {m.clientId === room.ownerId && <span className="tag">房主</span>}
-                {m.inVoice && <span className="tag tag-voice">語音中</span>}
-                {!m.connected && <span className="tag">斷線</span>}
+                {m.clientId === room.ownerId && <span className="tag">{t('房主', 'Host')}</span>}
+                {m.inVoice && <span className="tag tag-voice">{t('語音中', 'On voice')}</span>}
+                {!m.connected && <span className="tag">{t('斷線', 'Offline')}</span>}
               </li>
             ))}
             {Array.from({ length: ai }, (_, i) => (
               <li key={`ai${i}`} className="is-ai">
-                <span className="m-name">電腦補位</span>
+                <span className="m-name">{t('電腦補位', 'Computer player')}</span>
               </li>
             ))}
           </ul>
 
-          <h2>設定</h2>
+          <h2>{t('設定', 'Settings')}</h2>
           {isOwner ? (
             <div className="room-settings">
               <div className="field">
-                <span>遊戲人數（人不夠會由電腦補位）</span>
-                <div className="segmented" role="radiogroup" aria-label="遊戲人數">
+                <span>{t('遊戲人數（人不夠會由電腦補位）', 'Players (computers fill empty seats)')}</span>
+                <div className="segmented" role="radiogroup" aria-label={t('遊戲人數', 'Number of players')}>
                   {Array.from({ length: maxPlayersFor(s.expansions) - MIN_PLAYERS + 1 }, (_, i) => MIN_PLAYERS + i).map((n) => (
                     <button key={n} type="button" role="radio" aria-checked={n === s.count} className={n === s.count ? 'on' : ''} disabled={n < humans} onClick={() => session.updateSettings({ count: n })}>
                       {n}
@@ -172,21 +174,25 @@ function RoomView({ session, voice, onLeave }: { session: RoomSession; voice: Vo
                 </div>
               </div>
               <ExpansionPicker value={s.expansions} onChange={(v) => session.updateSettings({ expansions: v })} />
+              <LevelPicker value={s.aiLevel ?? 'normal'} onChange={(v) => session.updateSettings({ aiLevel: v })} />
               <button type="button" className="primary start" onClick={session.start}>
-                開始遊戲{ai > 0 ? `（${ai} 位電腦補位）` : ''}
+                {t('開始遊戲', 'Start game')}
+                {ai > 0 ? t(`（${ai} 位電腦補位）`, ` (${ai} computer player${ai > 1 ? 's' : ''})`) : ''}
               </button>
             </div>
           ) : (
             <p className="room-readonly">
-              {s.count} 人局{s.expansions.length ? `．擴充 ${s.expansions.length} 個` : '．基本版'}
+              {t(`${s.count} 人局`, `${s.count} players`)}
+              {s.expansions.length ? t(`．擴充 ${s.expansions.length} 個`, ` · ${s.expansions.length} expansion${s.expansions.length > 1 ? 's' : ''}`) : t('．基本版', ' · base game')}
+              {t(`．電腦${{ easy: '簡單', normal: '普通', hard: '困難' }[s.aiLevel ?? 'normal']}`, ` · ${{ easy: 'easy', normal: 'normal', hard: 'hard' }[s.aiLevel ?? 'normal']} computers`)}
               <br />
-              <span className="muted">等房主{owner ? `（${owner.name}）` : ''}開始遊戲…</span>
+              <span className="muted">{t(`等房主${owner ? `（${owner.name}）` : ''}開始遊戲…`, `Waiting for the host${owner ? ` (${owner.name})` : ''} to start…`)}</span>
             </p>
           )}
         </section>
 
         <aside className="room-chat">
-          <h2>聊天</h2>
+          <h2>{t('聊天', 'Chat')}</h2>
           <ChatPanel chat={session.chat} me={session.me} say={session.say} />
         </aside>
       </div>

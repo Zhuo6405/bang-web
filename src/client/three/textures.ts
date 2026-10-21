@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { CARD_DEFS, rankLabel, SUIT_SYMBOL } from '../../engine/data'
 import type { Card } from '../../engine/types'
+import { cardName, type Lang } from '../../engine/i18n'
 
 // 牌面用 canvas 畫成貼圖：中文直接用瀏覽器字型，不需要另外下載字體檔
 
@@ -31,9 +32,35 @@ export function clearTextures() {
   cache.clear()
 }
 
-export function cardTexture(card: Card) {
+/** 在寬度內放得下的最大字級 */
+function fit(g: CanvasRenderingContext2D, text: string, max: number, from: number, to: number, weight = 900) {
+  let size = from
+  for (; size > to; size -= 2) {
+    g.font = `${weight} ${size}px ${SERIF}`
+    if (g.measureText(text).width <= max) break
+  }
+  g.font = `${weight} ${size}px ${SERIF}`
+  return size
+}
+
+/** 依寬度換行：中文逐字，英文逐詞 */
+function wrap(g: CanvasRenderingContext2D, text: string, max: number) {
+  const words = /[A-Za-z]/.test(text) ? text.split(/(\s+)/) : [...text]
+  const lines: string[] = []
+  let line = ''
+  for (const w of words) {
+    if (line && g.measureText(line + w).width > max) {
+      lines.push(line.trim())
+      line = w.trimStart()
+    } else line += w
+  }
+  if (line.trim()) lines.push(line.trim())
+  return lines
+}
+
+export function cardTexture(card: Card, lang: Lang = 'zh') {
   const def = CARD_DEFS[card.key]
-  return make(`card-${card.key}-${card.suit}-${card.rank}`, 256, 360, (g) => {
+  return make(`card-${lang}-${card.key}-${card.suit}-${card.rank}`, 256, 360, (g) => {
     g.fillStyle = BORDER[def.colour]
     g.fillRect(0, 0, 256, 360)
     g.fillStyle = '#efe3c4'
@@ -46,18 +73,41 @@ export function cardTexture(card: Card) {
     g.textAlign = 'left'
     g.textBaseline = 'top'
     g.fillText(`${rankLabel(card.rank)}${SUIT_SYMBOL[card.suit]}`, 24, 22)
-    // 牌名
-    const name = def.name
+    // 牌名：放不下就縮小，英文太長就分兩行
+    const name = cardName(card.key, lang)
     g.fillStyle = '#2a1a10'
     g.textAlign = 'center'
     g.textBaseline = 'middle'
-    const size = name.length <= 2 ? 84 : name.length <= 3 ? 66 : name.length <= 4 ? 52 : 42
-    g.font = `900 ${size}px ${SERIF}`
-    g.fillText(name, 128, 175)
+    const size = fit(g, name, 214, lang === 'en' ? 60 : 84, 34)
+    if (size <= 34 && name.includes(' ')) {
+      g.font = `900 40px ${SERIF}`
+      const lines = wrap(g, name, 214)
+      lines.slice(0, 2).forEach((l, i) => g.fillText(l, 128, 175 + (i - (Math.min(2, lines.length) - 1) / 2) * 46))
+    } else g.fillText(name, 128, 175)
     // 底部：類型
     g.fillStyle = BORDER[def.colour]
-    g.font = `700 26px ${SERIF}`
-    g.fillText(def.colour === 'blue' ? (def.range ? `武器．射程 ${def.range}` : '裝備') : def.colour === 'green' ? '綠牌（下回合起可用）' : def.cost ? '另外棄 1 張' : '立即使用', 128, 318)
+    const kind =
+      lang === 'en'
+        ? def.colour === 'blue'
+          ? def.range
+            ? `Weapon · range ${def.range}`
+            : 'Equipment'
+          : def.colour === 'green'
+            ? 'Green (from next turn)'
+            : def.cost
+              ? '+1 discard'
+              : 'Play now'
+        : def.colour === 'blue'
+          ? def.range
+            ? `武器．射程 ${def.range}`
+            : '裝備'
+          : def.colour === 'green'
+            ? '綠牌（下回合起可用）'
+            : def.cost
+              ? '另外棄 1 張'
+              : '立即使用'
+    fit(g, kind, 214, 26, 16, 700)
+    g.fillText(kind, 128, 318)
   })
 }
 
@@ -83,7 +133,7 @@ export function cardBackTexture() {
 /** 浮在空中的字（砰！、射偏了！、-1） */
 export function wordTexture(text: string, colour: string) {
   return make(`word-${text}-${colour}`, 512, 160, (g) => {
-    g.font = `900 104px ${SERIF}`
+    fit(g, text, 470, 104, 40)
     g.textAlign = 'center'
     g.textBaseline = 'middle'
     g.lineWidth = 14
@@ -95,8 +145,8 @@ export function wordTexture(text: string, colour: string) {
 }
 
 /** 事件牌：通緝令風格 */
-export function eventTexture(name: string, text: string) {
-  return make(`event-${name}`, 360, 500, (g) => {
+export function eventTexture(name: string, text: string, lang: Lang = 'zh') {
+  return make(`event-${lang}-${name}`, 360, 500, (g) => {
     g.fillStyle = '#d9c08a'
     g.fillRect(0, 0, 360, 500)
     g.strokeStyle = '#5a3518'
@@ -106,24 +156,16 @@ export function eventTexture(name: string, text: string) {
     g.textAlign = 'center'
     g.textBaseline = 'middle'
     g.font = `900 34px ${SERIF}`
-    g.fillText('事 件', 180, 62)
-    g.font = `900 ${name.length <= 2 ? 92 : name.length <= 3 ? 76 : 60}px ${SERIF}`
+    g.fillText(lang === 'en' ? 'EVENT' : '事 件', 180, 62)
     g.fillStyle = '#7a1e12'
+    fit(g, name, 300, lang === 'en' ? 64 : 92, 30)
     g.fillText(name, 180, 160)
     g.fillStyle = '#2a1a10'
-    g.font = `600 26px ${SERIF}`
+    g.font = `600 ${lang === 'en' ? 24 : 26}px ${SERIF}`
     // 自動換行
-    const lines: string[] = []
-    let line = ''
-    for (const ch of text) {
-      if (g.measureText(line + ch).width > 290) {
-        lines.push(line)
-        line = ''
-      }
-      line += ch
-    }
-    if (line) lines.push(line)
-    lines.slice(0, 8).forEach((l, i) => g.fillText(l, 180, 250 + i * 34))
+    wrap(g, text, 290)
+      .slice(0, 8)
+      .forEach((l, i) => g.fillText(l, 180, 250 + i * 32))
   })
 }
 

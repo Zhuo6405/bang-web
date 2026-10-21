@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useLang } from './lang'
 import type { GameConfig } from '../engine/types'
 import { RoomSession } from './net/session'
 import { LocalGame } from './ui/Game'
@@ -16,6 +17,8 @@ function clearRoomParam() {
 }
 
 export default function App() {
+  // 切換語言時整個畫面重畫（不重設遊戲狀態）
+  useLang()
   const [mode, setMode] = useState<Mode>({ k: 'lobby' })
   const back = () => {
     clearRoomParam()
