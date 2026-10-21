@@ -37,7 +37,7 @@ export function LocalGame({ config, onExit }: { config: GameConfig; onExit: () =
       historyId={`local-${config.seed}`}
       resultActions={
         <button type="button" className="primary" onClick={onExit}>
-          {t('回到大廳', 'Back to lobby')}
+          {t('回到大廳', 'Back to lobby', 'Về sảnh')}
         </button>
       }
     />
@@ -142,7 +142,7 @@ function Table({
 
   useEffect(() => {
     const base = 'BANG!'
-    document.title = v.result ? base : d?.type === 'play' ? t('● 輪到你了｜BANG!', '● Your turn | BANG!') : d ? t('● 需要你回應｜BANG!', '● Your move | BANG!') : base
+    document.title = v.result ? base : d?.type === 'play' ? t('● 輪到你了｜BANG!', '● Your turn | BANG!', '● Đến lượt bạn | BANG!') : d ? t('● 需要你回應｜BANG!', '● Your move | BANG!', '● Bạn cần trả lời | BANG!') : base
     return () => {
       document.title = base
     }
@@ -231,50 +231,50 @@ function Table({
       <header className="topbar">
         <span className="brand">BANG!</span>
         <span className="turn">
-          {t(`第 ${v.turnNo} 回合`, `Turn ${v.turnNo}`)}
-          <b className={v.active === v.me ? 'turn-me' : ''}>{v.active === v.me ? t('你的回合', 'Your turn') : t(`${v.players[v.active].name} 的回合`, `${v.players[v.active].name}’s turn`)}</b>
+          {t(`第 ${v.turnNo} 回合`, `Turn ${v.turnNo}`, `Lượt ${v.turnNo}`)}
+          <b className={v.active === v.me ? 'turn-me' : ''}>{v.active === v.me ? t('你的回合', 'Your turn', 'Lượt của bạn') : t(`${v.players[v.active].name} 的回合`, `${v.players[v.active].name}’s turn`, `Lượt của ${v.players[v.active].name}`)}</b>
         </span>
         {social && <VoiceControls voice={social.voice} speakers={social.room.members.filter((m) => m.inVoice).length} />}
         {topExtra}
         <button type="button" className="ghost sound-btn" onClick={() => setSoundOn(!soundOn)} aria-pressed={soundOn}>
-          {soundOn ? t('音效 開', 'Sound on') : t('音效 關', 'Sound off')}
+          {soundOn ? t('音效 開', 'Sound on', 'Âm thanh bật') : t('音效 關', 'Sound off', 'Âm thanh tắt')}
         </button>
         <button type="button" className="ghost" onClick={() => setInspect(v.me)}>
-          {t('角色能力', 'Abilities')}
+          {t('角色能力', 'Abilities', 'Năng lực')}
         </button>
         <DocsButtons />
         <LangToggle />
         <button type="button" className="ghost side-toggle" onClick={() => setSideOpen((o) => !o)} aria-expanded={sideOpen}>
-          {sideOpen ? t('收起', 'Hide') : t('紀錄與聊天', 'Log & chat')}
+          {sideOpen ? t('收起', 'Hide', 'Thu gọn') : t('紀錄與聊天', 'Log & chat', 'Nhật ký & trò chuyện')}
           {unread > 0 && <span className="badge">{unread}</span>}
         </button>
         <button type="button" className="ghost" onClick={onExit}>
-          {exitLabel ?? t('離開', 'Leave')}
+          {exitLabel ?? t('離開', 'Leave', 'Rời đi')}
         </button>
       </header>
 
       <div className="layout">
-        <section className={`stage ${hurt ? 'is-hurt' : ''}`} aria-label={t('牌桌（可拖曳轉動視角）', 'Table (drag to look around)')}>
-          <Suspense fallback={<div className="stage-loading">{t('酒館佈置中…', 'Setting up the saloon…')}</div>}>
+        <section className={`stage ${hurt ? 'is-hurt' : ''}`} aria-label={t('牌桌（可拖曳轉動視角）', 'Table (drag to look around)', 'Bàn chơi (kéo để nhìn quanh)')}>
+          <Suspense fallback={<div className="stage-loading">{t('酒館佈置中…', 'Setting up the saloon…', 'Đang bày biện quán rượu…')}</div>}>
             <TableScene v={v} waitingOn={ctl.waitingOn} aiControlled={ctl.aiControlled} mode={viewMode} selected={sel} />
           </Suspense>
           <div className="stage-hud">
             <EventBanner v={v} />
             <MyStatus v={v} />
             <p className="stage-piles">
-              {t(`牌堆 ${v.deckCount}．`, `Deck ${v.deckCount} · `)}
-              {v.dir === -1 ? t('逆時針．', 'anticlockwise · ') : ''}
-              {viewMode === 'first' ? t('拖曳可轉頭', 'drag to turn your head') : t('拖曳可旋轉視角', 'drag to rotate')}
+              {t(`牌堆 ${v.deckCount}．`, `Deck ${v.deckCount} · `, `Chồng bài ${v.deckCount} · `)}
+              {v.dir === -1 ? t('逆時針．', 'anticlockwise · ', 'ngược chiều kim đồng hồ · ') : ''}
+              {viewMode === 'first' ? t('拖曳可轉頭', 'drag to turn your head', 'kéo để quay đầu') : t('拖曳可旋轉視角', 'drag to rotate', 'kéo để xoay')}
             </p>
           </div>
           {me.alive && me.table.some((c) => c.key === 'jail') && (
-            <div className="jail-bars" aria-label={t('你被關在監獄裡', 'You are in Jail')}>
-              <span>{t('你被關進監獄了！回合開始時抽判定：紅心才能越獄', 'You are in Jail! At the start of your turn draw!: only a Heart lets you out')}</span>
+            <div className="jail-bars" aria-label={t('你被關在監獄裡', 'You are in Jail', 'Bạn đang ở trong Jail')}>
+              <span>{t('你被關進監獄了！回合開始時抽判定：紅心才能越獄', 'You are in Jail! At the start of your turn draw!: only a Heart lets you out', 'Bạn đang ở trong Jail! Đầu lượt rút phán định: chỉ ra Cơ mới được thả')}</span>
             </div>
           )}
           <div className="stage-view">
             <button type="button" onClick={toggleView} aria-pressed={viewMode === 'overview'}>
-              {viewMode === 'first' ? t('切換到俯瞰視角', 'Overhead view') : t('切換到第一人稱', 'First-person view')}
+              {viewMode === 'first' ? t('切換到俯瞰視角', 'Overhead view', 'Nhìn từ trên cao') : t('切換到第一人稱', 'First-person view', 'Góc nhìn thứ nhất')}
             </button>
           </div>
         </section>
@@ -287,13 +287,13 @@ function Table({
             </div>
             {me.role && (
               <p className="me-mission">
-                {t('勝利條件：', 'Goal: ')}
+                {t('勝利條件：', 'Goal: ', 'Mục tiêu: ')}
                 {roleGoal(me.role, L())}
               </p>
             )}
             {myChar && (
               <p className="me-mission">
-                {t('角色能力：', 'Ability: ')}
+                {t('角色能力：', 'Ability: ', 'Năng lực: ')}
                 {chT(myChar)}
               </p>
             )}
@@ -302,10 +302,10 @@ function Table({
           {social && (
             <div className="tabs" role="tablist">
               <button type="button" role="tab" aria-selected={tab === 'log'} className={tab === 'log' ? 'on' : ''} onClick={() => setTab('log')}>
-                {t('遊戲紀錄', 'Log')}
+                {t('遊戲紀錄', 'Log', 'Nhật ký')}
               </button>
               <button type="button" role="tab" aria-selected={tab === 'chat'} className={tab === 'chat' ? 'on' : ''} onClick={() => setTab('chat')}>
-                {t('聊天', 'Chat')}
+                {t('聊天', 'Chat', 'Trò chuyện')}
                 {unread > 0 && <span className="badge">{unread}</span>}
               </button>
             </div>
@@ -315,7 +315,7 @@ function Table({
       </div>
 
       {inspect != null && <PlayersPanel v={v} focus={inspect} onClose={() => setInspect(null)} />}
-      <section className={`bench ${d ? 'is-my-move' : ''}`} aria-label={t('你的手牌與行動', 'Your hand and actions')}>
+      <section className={`bench ${d ? 'is-my-move' : ''}`} aria-label={t('你的手牌與行動', 'Your hand and actions', 'Bài trên tay và hành động của bạn')}>
         <Prompt
           v={v}
           ctl={ctl}
@@ -334,8 +334,8 @@ function Table({
           touch={touch}
           openCard={playOrOpen}
         />
-        <div className="hand" role="group" aria-label={t('手牌', 'Hand')}>
-          {v.hand.length === 0 && <span className="muted">{t('沒有手牌', 'No cards in hand')}</span>}
+        <div className="hand" role="group" aria-label={t('手牌', 'Hand', 'Bài trên tay')}>
+          {v.hand.length === 0 && <span className="muted">{t('沒有手牌', 'No cards in hand', 'Không có bài trên tay')}</span>}
           {v.hand.map((c) => (
             <CardFace
               key={c.id}
@@ -410,16 +410,16 @@ function EventBanner({ v }: { v: GameView }) {
   if (!v.event && !v.eventsLeft) return null
   return (
     <div className="event-banner">
-      <span className="event-tag">{t('事件', 'Event')}</span>
+      <span className="event-tag">{t('事件', 'Event', 'Sự kiện')}</span>
       {v.event ? (
         <>
           <b>{eventName(v.event, L())}</b>
           <span>{eventText(v.event, L())}</span>
         </>
       ) : (
-        <span>{t('警長第二回合開始翻開第一張事件牌。', 'The first event is revealed at the start of the Sheriff’s second turn.')}</span>
+        <span>{t('警長第二回合開始翻開第一張事件牌。', 'The first event is revealed at the start of the Sheriff’s second turn.', 'Sự kiện đầu tiên được lật vào đầu lượt thứ hai của Cảnh sát trưởng.')}</span>
       )}
-      <small>{t(`剩 ${v.eventsLeft} 張`, `${v.eventsLeft} left`)}</small>
+      <small>{t(`剩 ${v.eventsLeft} 張`, `${v.eventsLeft} left`, `còn ${v.eventsLeft} lá`)}</small>
     </div>
   )
 }
@@ -428,17 +428,17 @@ function MyStatus({ v }: { v: GameView }) {
   const me = v.players[v.me]
   return (
     <div className="mystatus">
-      <div className="plate-hp" aria-label={t(`你的生命 ${me.hp} / ${me.maxHp}`, `Your life ${me.hp} / ${me.maxHp}`)}>
-        <span className="hp-label">{t('生命', 'Life')}</span>
+      <div className="plate-hp" aria-label={t(`你的生命 ${me.hp} / ${me.maxHp}`, `Your life ${me.hp} / ${me.maxHp}`, `Máu của bạn ${me.hp} / ${me.maxHp}`)}>
+        <span className="hp-label">{t('生命', 'Life', 'Máu')}</span>
         {Array.from({ length: me.maxHp }, (_, i) => (
           <span key={i} className={i < me.hp ? 'bullet on' : 'bullet'} />
         ))}
       </div>
       <div className="mystatus-row">
-        {t(`射程 ${v.myRange}`, `Range ${v.myRange}`)}
+        {t(`射程 ${v.myRange}`, `Range ${v.myRange}`, `Tầm ${v.myRange}`)}
         {v.suit && (
           <span className="cuffs">
-            {t('手銬：只能出', 'Handcuffs: only ')}
+            {t('手銬：只能出', 'Handcuffs: only ', 'Handcuffs: chỉ được đánh ')}
             {SUIT_SYMBOL[v.suit]}
             {suitName(v.suit, L())}
           </span>
@@ -454,7 +454,7 @@ function Gear({ cards, fresh }: { cards: Card[]; fresh: number[] }) {
   return (
     <span className="plate-gear">
       {cards.map((c) => (
-        <span key={c.id} className={`gear g-${CARD_DEFS[c.key].colour} ${fresh.includes(c.id) ? 'is-fresh' : ''}`} title={cD(c.key) + (fresh.includes(c.id) ? t('（下一回合起可用）', ' (usable from next turn)') : '')}>
+        <span key={c.id} className={`gear g-${CARD_DEFS[c.key].colour} ${fresh.includes(c.id) ? 'is-fresh' : ''}`} title={cD(c.key) + (fresh.includes(c.id) ? t('（下一回合起可用）', ' (usable from next turn)', ' (dùng được từ lượt sau)') : '')}>
           {cN(c.key)}
         </span>
       ))}
@@ -468,10 +468,10 @@ function PlayersPanel({ v, focus, onClose }: { v: GameView; focus: number; onClo
   useEffect(() => ref.current?.scrollIntoView({ block: 'nearest' }), [focus])
   return (
     <div className="sheet-backdrop" onClick={onClose}>
-      <div className="sheet players-panel" role="dialog" aria-label={t('角色能力與裝備', 'Abilities and equipment')} onClick={(e) => e.stopPropagation()}>
+      <div className="sheet players-panel" role="dialog" aria-label={t('角色能力與裝備', 'Abilities and equipment', 'Năng lực và trang bị')} onClick={(e) => e.stopPropagation()}>
         <div className="sheet-head">
-          <b>{t('角色能力與裝備', 'Abilities and equipment')}</b>
-          <button type="button" className="sheet-close" onClick={onClose} aria-label={t('關閉', 'Close')}>
+          <b>{t('角色能力與裝備', 'Abilities and equipment', 'Năng lực và trang bị')}</b>
+          <button type="button" className="sheet-close" onClick={onClose} aria-label={t('關閉', 'Close', 'Đóng')}>
             ✕
           </button>
         </div>
@@ -483,20 +483,20 @@ function PlayersPanel({ v, focus, onClose }: { v: GameView; focus: number; onClo
               <li key={p.seat} ref={p.seat === focus ? ref : undefined} className={`pp ${p.seat === focus ? 'is-focus' : ''} ${p.alive ? '' : 'is-out'}`}>
                 <div className="pp-head">
                   <b>{p.name}</b>
-                  {p.seat === v.me && <span className="seat-you">{t('你', 'You')}</span>}
+                  {p.seat === v.me && <span className="seat-you">{t('你', 'You', 'Bạn')}</span>}
                   {p.role && <RoleBadge role={p.role} />}
-                  {jailed && <span className="mark m-lock">{t('監獄中', 'In Jail')}</span>}
-                  {!p.alive && <span className="mark m-dead">{p.ghost ? t('幽靈', 'Ghost') : t('死亡', 'Dead')}</span>}
+                  {jailed && <span className="mark m-lock">{t('監獄中', 'In Jail', 'Đang ở Jail')}</span>}
+                  {!p.alive && <span className="mark m-dead">{p.ghost ? t('幽靈', 'Ghost', 'Hồn ma') : t('死亡', 'Dead', 'Đã chết')}</span>}
                 </div>
                 <div className="pp-char">
                   <b>{c ? chN(c) : '—'}</b>
-                  <span className="pp-hp" aria-label={t(`生命 ${p.hp}/${p.maxHp}`, `Life ${p.hp}/${p.maxHp}`)}>
+                  <span className="pp-hp" aria-label={t(`生命 ${p.hp}/${p.maxHp}`, `Life ${p.hp}/${p.maxHp}`, `Máu ${p.hp}/${p.maxHp}`)}>
                     {Array.from({ length: p.maxHp }, (_, i) => (
                       <span key={i} className={i < p.hp ? 'bullet on' : 'bullet'} />
                     ))}
                     <small>
                       {Math.max(0, p.hp)}/{p.maxHp}
-                      {p.role === 'sheriff' && c ? t(`（${p.maxHp - 1}+1 警長）`, ` (${p.maxHp - 1}+1 Sheriff)`) : ''}
+                      {p.role === 'sheriff' && c ? t(`（${p.maxHp - 1}+1 警長）`, ` (${p.maxHp - 1}+1 Sheriff)`, ` (${p.maxHp - 1}+1 Cảnh sát trưởng)`) : ''}
                     </small>
                   </span>
                 </div>
@@ -517,7 +517,7 @@ function PlayersPanel({ v, focus, onClose }: { v: GameView; focus: number; onClo
                     ))}
                   </ul>
                 ) : (
-                  <p className="pp-none">{t('沒有裝備', 'No equipment')}</p>
+                  <p className="pp-none">{t('沒有裝備', 'No equipment', 'Không có trang bị')}</p>
                 )}
               </li>
             )
@@ -532,20 +532,20 @@ function PlayersPanel({ v, focus, onClose }: { v: GameView; focus: number; onClo
 function Roster({ v }: { v: GameView }) {
   return (
     <div className="roster">
-      <h3>{t('牌桌上的人', 'At the table')}</h3>
+      <h3>{t('牌桌上的人', 'At the table', 'Quanh bàn')}</h3>
       <ul>
         {v.players.map((p) => (
           <li key={p.seat} className={`${p.alive ? '' : 'is-out'} ${p.seat === v.active ? 'is-active' : ''}`}>
             <span className="r-name">
               {p.name}
-              {p.seat === v.me && <span className="seat-you">{t('你', 'You')}</span>}
+              {p.seat === v.me && <span className="seat-you">{t('你', 'You', 'Bạn')}</span>}
             </span>
             <span className="r-char">{p.character ? chN(p.character) : ''}</span>
             {p.character && <span className="r-ability">{chT(p.character)}</span>}
             {p.role && <RoleBadge role={p.role} />}
             <span className="r-hp">
-              {p.ghost ? t('幽靈', 'Ghost') : p.alive ? `♥ ${p.hp}/${p.maxHp}` : t('已死亡', 'Dead')}
-              {p.alive && p.seat !== v.me && v.players[v.me].alive && <span className={`plate-dist ${p.dist <= v.myRange ? 'in-range' : ''}`}>{t(`距 ${p.dist}`, `dist ${p.dist}`)}</span>}
+              {p.ghost ? t('幽靈', 'Ghost', 'Hồn ma') : p.alive ? `♥ ${p.hp}/${p.maxHp}` : t('已死亡', 'Dead', 'Đã chết')}
+              {p.alive && p.seat !== v.me && v.players[v.me].alive && <span className={`plate-dist ${p.dist <= v.myRange ? 'in-range' : ''}`}>{t(`距 ${p.dist}`, `dist ${p.dist}`, `cách ${p.dist}`)}</span>}
             </span>
             {(p.table.length > 0 || v.goldOn) && (
               <span className="r-gear">
@@ -561,12 +561,12 @@ function Roster({ v }: { v: GameView }) {
 }
 
 function describeOthers(v: GameView, waitingOn: number[]): string {
-  if (v.result) return t('遊戲結束', 'Game over')
+  if (v.result) return t('遊戲結束', 'Game over', 'Kết thúc')
   const who = waitingOn.filter((p) => p !== v.me)
-  if (who.length === 0) return t('結算中…', 'Resolving…')
+  if (who.length === 0) return t('結算中…', 'Resolving…', 'Đang xử lý…')
   const name = v.players[who[0]].name
-  if (who[0] === v.active) return t(`等待 ${name} 出牌…`, `Waiting for ${name} to play…`)
-  return t(`等待 ${name} 回應…`, `Waiting for ${name} to respond…`)
+  if (who[0] === v.active) return t(`等待 ${name} 出牌…`, `Waiting for ${name} to play…`, `Đang chờ ${name} đánh bài…`)
+  return t(`等待 ${name} 回應…`, `Waiting for ${name} to respond…`, `Đang chờ ${name} trả lời…`)
 }
 
 function Prompt({
@@ -620,10 +620,10 @@ function Prompt({
     return (
       <div className="prompt is-mine">
         <p className="prompt-text">
-          <span className="your-turn">{t('代價', 'Cost')}</span>
+          <span className="your-turn">{t('代價', 'Cost', 'Chi phí')}</span>
           {t(
             `使用【${playName(l.as)}】要另外棄 ${l.cost} 張${l.costKind ? '「砰！」' : '手牌'}：點選下方的牌。`,
-            `To play ${playName(l.as)} you must also discard ${l.cost} ${l.costKind ? 'BANG!' : `card${(l.cost ?? 1) > 1 ? 's' : ''}`}: tap them below.`,
+            `To play ${playName(l.as)} you must also discard ${l.cost} ${l.costKind ? 'BANG!' : `card${(l.cost ?? 1) > 1 ? 's' : ''}`}: tap them below.`, `Để đánh ${playName(l.as)} bạn phải bỏ thêm ${l.cost} ${l.costKind ? 'BANG!' : 'lá'}: chạm vào các lá bên dưới.`,
           )}
         </p>
         <div className="choices">
@@ -633,10 +633,10 @@ function Prompt({
             disabled={picked.length !== l.cost}
             onClick={() => act({ type: 'play', card: l.card, as: l.as, target: costFor.target, targetCard: costFor.targetCard, extra: picked })}
           >
-            {t(`確定（已選 ${picked.length} 張）`, `Confirm (${picked.length} selected)`)}
+            {t(`確定（已選 ${picked.length} 張）`, `Confirm (${picked.length} selected)`, `Xác nhận (đã chọn ${picked.length})`)}
           </button>
           <button type="button" onClick={() => setCostFor(null)}>
-            {t('取消', 'Cancel')}
+            {t('取消', 'Cancel', 'Hủy')}
           </button>
         </div>
       </div>
@@ -649,14 +649,14 @@ function Prompt({
     return (
       <div className="prompt is-mine">
         <p className="prompt-text">
-          <span className="your-turn">{t('能力', 'Ability')}</span>
+          <span className="your-turn">{t('能力', 'Ability', 'Năng lực')}</span>
           {tx(ability.label)}
-          {ability.cards > 0 ? t(`：點選下方 ${ability.cards} 張手牌。`, `: tap ${ability.cards} card${ability.cards > 1 ? 's' : ''} below.`) : ''}
+          {ability.cards > 0 ? t(`：點選下方 ${ability.cards} 張手牌。`, `: tap ${ability.cards} card${ability.cards > 1 ? 's' : ''} below.`, `: chạm ${ability.cards} lá bên dưới.`) : ''}
         </p>
         <div className="choices">
           {ability.targets ? (
             <span className="choice-group">
-              <span className="choice-label">{t('目標', 'Target')}</span>
+              <span className="choice-label">{t('目標', 'Target', 'Mục tiêu')}</span>
               {ability.targets.map((q) => (
                 <button key={q} type="button" className="primary" disabled={!ready} onClick={() => act({ type: 'ability', ability: ability.id, cards: picked, target: q })}>
                   {v.players[q].name}
@@ -665,11 +665,11 @@ function Prompt({
             </span>
           ) : (
             <button type="button" className="primary" disabled={!ready} onClick={() => act({ type: 'ability', ability: ability.id, cards: picked })}>
-              {t('確定', 'Confirm')}
+              {t('確定', 'Confirm', 'Xác nhận')}
             </button>
           )}
           <button type="button" onClick={() => setAbility(null)}>
-            {t('取消', 'Cancel')}
+            {t('取消', 'Cancel', 'Hủy')}
           </button>
         </div>
       </div>
@@ -679,28 +679,28 @@ function Prompt({
   return (
     <div className={`prompt ${mine ? 'is-mine' : ''}`}>
       <p className="prompt-text">
-        {mine && <span className="your-turn">{d!.type === 'ask' ? tx(d!.ask.title) : t('輪到你了', 'Your turn')}</span>}
+        {mine && <span className="your-turn">{d!.type === 'ask' ? tx(d!.ask.title) : t('輪到你了', 'Your turn', 'Lượt của bạn')}</span>}
         {!mine
           ? describeOthers(v, ctl.waitingOn)
           : d!.type === 'ask'
             ? tx(d!.ask.prompt)
             : v.must != null
-              ? t('西部法則：先打出亮出的那張牌（金框）。', 'Law of the West: play the card you showed first (gold frame).')
-              : t('你的出牌階段：點一張手牌使用，打完按「結束回合」。', 'Your play phase: tap a card to use it, then press “End turn”.')}
-        {left != null && <span className={`countdown ${left <= 5 ? 'is-urgent' : ''}`}>{t(`剩 ${left} 秒`, `${left}s left`)}</span>}
+              ? t('西部法則：先打出亮出的那張牌（金框）。', 'Law of the West: play the card you showed first (gold frame).', 'Law of the West: đánh lá đã lật trước (khung vàng).')
+              : t('你的出牌階段：點一張手牌使用，打完按「結束回合」。', 'Your play phase: tap a card to use it, then press “End turn”.', 'Giai đoạn đánh bài của bạn: chạm một lá để dùng, xong thì bấm “Kết thúc lượt”.')}
+        {left != null && <span className={`countdown ${left <= 5 ? 'is-urgent' : ''}`}>{t(`剩 ${left} 秒`, `${left}s left`, `còn ${left} giây`)}</span>}
       </p>
 
       {d?.type === 'ask' && <AskPanel v={v} ask={d.ask} picked={picked} setPicked={setPicked} act={act} />}
       {d?.type === 'play' && selCard && touch && (
         <div className="selected">
           <p className="sel-desc">
-            <b>{t(`【${cN(selCard.key)}】`, `${cN(selCard.key)}: `)}</b>
+            <b>{t(`【${cN(selCard.key)}】`, `${cN(selCard.key)}: `, `${cN(selCard.key)}: `)}</b>
             {cD(selCard.key)}
           </p>
           <div className="choices">
             {legal.length ? (
               <button type="button" className="primary" onClick={() => openCard(selCard.id)}>
-                {t('打出這張牌（或再點一下牌）', 'Play this card (or tap it again)')}
+                {t('打出這張牌（或再點一下牌）', 'Play this card (or tap it again)', 'Đánh lá này (hoặc chạm lại lá bài)')}
               </button>
             ) : (
               <span className="muted">{whyNot(v, selCard)}</span>
@@ -711,7 +711,7 @@ function Prompt({
       {d?.type === 'play' && selCard && !touch && (
         <div className="selected">
           <p className="sel-desc">
-            <b>{t(`【${cN(selCard.key)}】`, `${cN(selCard.key)}: `)}</b>
+            <b>{t(`【${cN(selCard.key)}】`, `${cN(selCard.key)}: `, `${cN(selCard.key)}: `)}</b>
             {cD(selCard.key)}
           </p>
           <div className="choices">
@@ -727,7 +727,7 @@ function Prompt({
         <div className="choices">
           {d?.type === 'play' && tableCards.length > 0 && (
             <span className="choice-group">
-              <span className="choice-label">{t('場上的綠牌', 'Green cards in play')}</span>
+              <span className="choice-label">{t('場上的綠牌', 'Green cards in play', 'Lá xanh lá trên bàn')}</span>
               {tableCards.map((c) => (
                 <button key={c.id} type="button" className={`gear-btn ${selCard?.id === c.id ? 'on' : ''}`} onClick={() => { setSelShop(null); setSel(selCard?.id === c.id ? null : c.id) }}>
                   {cN(c.key)}
@@ -747,7 +747,7 @@ function Prompt({
           ))}
           {d?.type === 'play' && (
             <button type="button" className="end-turn" onClick={() => act({ type: 'end_turn' })}>
-              {t('結束回合', 'End turn')}
+              {t('結束回合', 'End turn', 'Kết thúc lượt')}
             </button>
           )}
         </div>
@@ -757,22 +757,22 @@ function Prompt({
 }
 
 function whyNot(v: GameView, c: Card) {
-  if (v.suit && c.suit !== v.suit) return t(`手銬：這回合只能出${suitName(v.suit, 'zh')}。`, `Handcuffs: only ${suitName(v.suit, 'en')} this turn.`)
-  if (v.must != null && v.must !== c.id) return t('西部法則：要先打出亮出的那張牌。', 'Law of the West: play the card you showed first.')
+  if (v.suit && c.suit !== v.suit) return t(`手銬：這回合只能出${suitName(v.suit, 'zh')}。`, `Handcuffs: only ${suitName(v.suit, 'en')} this turn.`, `Handcuffs: lượt này chỉ được đánh chất ${suitName(v.suit, 'vi')}.`)
+  if (v.must != null && v.must !== c.id) return t('西部法則：要先打出亮出的那張牌。', 'Law of the West: play the card you showed first.', 'Law of the West: phải đánh lá đã lật trước.')
   switch (c.key) {
     case 'missed':
     case 'dodge':
-      return t('這張要在被開槍時才能用。', 'This one is played when you are shot.')
+      return t('這張要在被開槍時才能用。', 'This one is played when you are shot.', 'Lá này chỉ đánh khi bạn bị bắn.')
     case 'bang':
-      return v.event === 'sermon' ? t('佈道：自己回合不能打「砰！」。', 'The Sermon: no BANG! on your own turn.') : v.bangsUsed > 0 ? t('這回合已經開過槍了。', 'You have already fired this turn.') : t('射程內沒有目標。', 'Nobody is in range.')
+      return v.event === 'sermon' ? t('佈道：自己回合不能打「砰！」。', 'The Sermon: no BANG! on your own turn.', 'The Sermon: không được đánh BANG! trong lượt của mình.') : v.bangsUsed > 0 ? t('這回合已經開過槍了。', 'You have already fired this turn.', 'Lượt này bạn đã bắn rồi.') : t('射程內沒有目標。', 'Nobody is in range.', 'Không có ai trong tầm.')
     case 'beer':
-      return v.event === 'reverend' ? t('牧師：不能喝啤酒。', 'The Reverend: no Beer.') : v.players.filter((p) => p.alive).length <= 2 ? t('只剩兩人時啤酒無效。', 'Beer has no effect with two players left.') : t('你的生命是滿的。', 'Your life is full.')
+      return v.event === 'reverend' ? t('牧師：不能喝啤酒。', 'The Reverend: no Beer.', 'The Reverend: không được uống Beer.') : v.players.filter((p) => p.alive).length <= 2 ? t('只剩兩人時啤酒無效。', 'Beer has no effect with two players left.', 'Beer không có tác dụng khi chỉ còn hai người.') : t('你的生命是滿的。', 'Your life is full.', 'Máu của bạn đã đầy.')
     case 'panic':
-      return t('距離 1 以內沒有可以搶的人。', 'Nobody to rob at distance 1.')
+      return t('距離 1 以內沒有可以搶的人。', 'Nobody to rob at distance 1.', 'Không có ai ở khoảng cách 1 để lấy bài.')
     default:
-      if (v.event === 'judge' && CARD_DEFS[c.key].colour !== 'brown') return t('法官：不能把牌放到場上。', 'The Judge: no cards may be put into play.')
-      if (CARD_DEFS[c.key].cost && v.hand.length < 2) return t('這張牌要另外棄 1 張手牌，你手牌不夠。', 'This card needs another card to discard, and you do not have one.')
-      return CARD_DEFS[c.key].colour !== 'brown' ? (v.fresh.includes(c.id) ? t('綠牌放上場的回合不能用。', 'A green card cannot be used the turn it comes into play.') : t('你已經有同樣的牌了。', 'You already have that card in play.')) : t('這張牌現在不能用。', 'This card cannot be played now.')
+      if (v.event === 'judge' && CARD_DEFS[c.key].colour !== 'brown') return t('法官：不能把牌放到場上。', 'The Judge: no cards may be put into play.', 'The Judge: không được đặt bài lên bàn.')
+      if (CARD_DEFS[c.key].cost && v.hand.length < 2) return t('這張牌要另外棄 1 張手牌，你手牌不夠。', 'This card needs another card to discard, and you do not have one.', 'Lá này cần bỏ thêm một lá khác, mà bạn không có.')
+      return CARD_DEFS[c.key].colour !== 'brown' ? (v.fresh.includes(c.id) ? t('綠牌放上場的回合不能用。', 'A green card cannot be used the turn it comes into play.', 'Lá xanh lá không dùng được trong lượt vừa đặt lên bàn.') : t('你已經有同樣的牌了。', 'You already have that card in play.', 'Bạn đã có lá này trên bàn rồi.')) : t('這張牌現在不能用。', 'This card cannot be played now.', 'Lá này hiện không đánh được.')
   }
 }
 
@@ -797,22 +797,22 @@ function PlayOptions({
     const gname = item ? gN(item.key) : ''
     label =
       legal.as === 'golddrop'
-        ? t(`付 ${legal.price} 金塊棄掉【${gname}】`, `Pay ${legal.price} nuggets to discard ${gname}`)
+        ? t(`付 ${legal.price} 金塊棄掉【${gname}】`, `Pay ${legal.price} nuggets to discard ${gname}`, `Trả ${legal.price} vàng để bỏ ${gname}`)
         : t(
             `${legal.price ? `花 ${legal.price} 金塊` : '免費'}${item && item.key !== legal.as ? `用【${gname}】當作【${name}】` : `買【${gname}】`}`,
-            `${item && item.key !== legal.as ? `Use ${gname} as ${name}` : `Buy ${gname}`} (${legal.price ? `${legal.price} nugget${legal.price > 1 ? 's' : ''}` : 'free'})`,
+            `${item && item.key !== legal.as ? `Use ${gname} as ${name}` : `Buy ${gname}`} (${legal.price ? `${legal.price} nugget${legal.price > 1 ? 's' : ''}` : 'free'})`, `${item && item.key !== legal.as ? `Dùng ${gname} làm ${name}` : `Mua ${gname}`} (${legal.price ? `${legal.price} vàng` : 'miễn phí'})`,
           )
   } else {
     const card = (legal.source === 'table' ? me.table : v.hand).find((c) => c.id === legal.card)!
     const colour = CARD_DEFS[card.key].colour
     label =
       legal.source === 'table'
-        ? t(`使用場上的【${name}】`, `Use ${name} in play`)
+        ? t(`使用場上的【${name}】`, `Use ${name} in play`, `Dùng ${name} trên bàn`)
         : card.key !== legal.as
-          ? t(`把【${cN(card.key)}】當作【${name}】`, `Play ${cN(card.key)} as ${name}`)
+          ? t(`把【${cN(card.key)}】當作【${name}】`, `Play ${cN(card.key)} as ${name}`, `Đánh ${cN(card.key)} làm ${name}`)
           : colour !== 'brown'
-            ? t(`${colour === 'green' ? '放到場上' : '裝備'}【${name}】`, `${colour === 'green' ? 'Put into play' : 'Equip'}: ${name}`)
-            : t(`使用【${name}】`, `Play ${name}`)
+            ? t(`${colour === 'green' ? '放到場上' : '裝備'}【${name}】`, `${colour === 'green' ? 'Put into play' : 'Equip'}: ${name}`, `${colour === 'green' ? 'Đặt lên bàn' : 'Trang bị'}: ${name}`)
+            : t(`使用【${name}】`, `Play ${name}`, `Đánh ${name}`)
   }
   const go = (t?: number, tc?: number | 'hand', t2?: number) => (legal.cost ? onCost(t, tc) : onPlay({ type: 'play', card: legal.card, as: legal.as, target: t, targetCard: tc, target2: t2 }))
   // 連開：選完第一個目標，再選他旁邊的第二個
@@ -820,7 +820,7 @@ function PlayOptions({
     const opts = legal.second[first] ?? []
     return (
       <span className="choice-group">
-        <span className="choice-label">{t(`【連開】第二個目標（${v.players[first].name} 旁邊的人）`, `Fanning: second target (next to ${v.players[first].name})`)}</span>
+        <span className="choice-label">{t(`【連開】第二個目標（${v.players[first].name} 旁邊的人）`, `Fanning: second target (next to ${v.players[first].name})`, `Fanning: mục tiêu thứ hai (cạnh ${v.players[first].name})`)}</span>
         {opts.map((q) => (
           <button key={q} type="button" className="primary" onClick={() => go(first, undefined, q)}>
             {v.players[q].name}
@@ -828,11 +828,11 @@ function PlayOptions({
         ))}
         {!opts.length && (
           <button type="button" className="primary" onClick={() => go(first)}>
-            {t(`只打 ${v.players[first].name}`, `Only ${v.players[first].name}`)}
+            {t(`只打 ${v.players[first].name}`, `Only ${v.players[first].name}`, `Chỉ ${v.players[first].name}`)}
           </button>
         )}
         <button type="button" onClick={() => setFirst(null)}>
-          {t('換人', 'Change target')}
+          {t('換人', 'Change target', 'Đổi mục tiêu')}
         </button>
       </span>
     )
@@ -841,7 +841,7 @@ function PlayOptions({
     return (
       <button type="button" className="primary" onClick={() => go()}>
         {label}
-        {legal.cost ? <small>{t(`另外棄 ${legal.cost} 張`, `+${legal.cost} discard`)}</small> : null}
+        {legal.cost ? <small>{t(`另外棄 ${legal.cost} 張`, `+${legal.cost} discard`, `bỏ thêm ${legal.cost}`)}</small> : null}
       </button>
     )
   }
@@ -850,20 +850,20 @@ function PlayOptions({
     return (
       <span className="choice-group">
         <span className="choice-label">
-          {t(`${label}：選 ${tg.name} 的哪一張`, `${label}: which of ${tg.name}’s cards?`)}
+          {t(`${label}：選 ${tg.name} 的哪一張`, `${label}: which of ${tg.name}’s cards?`, `${label}: lá nào của ${tg.name}?`)}
         </span>
         {!legal.tableOnly && tg.handCount > 0 && (
           <button type="button" className="primary" onClick={() => go(target, 'hand')}>
-            {t(`隨機一張手牌（${tg.handCount} 張）`, `A random card from hand (${tg.handCount})`)}
+            {t(`隨機一張手牌（${tg.handCount} 張）`, `A random card from hand (${tg.handCount})`, `Một lá ngẫu nhiên trên tay (${tg.handCount})`)}
           </button>
         )}
         {tg.table.map((c) => (
           <button key={c.id} type="button" className="primary" onClick={() => go(target, c.id)}>
-            {t(`場上的【${cN(c.key)}】`, `${cN(c.key)} in play`)}
+            {t(`場上的【${cN(c.key)}】`, `${cN(c.key)} in play`, `${cN(c.key)} trên bàn`)}
           </button>
         ))}
         <button type="button" onClick={() => setTarget(null)}>
-          {t('換人', 'Change target')}
+          {t('換人', 'Change target', 'Đổi mục tiêu')}
         </button>
       </span>
     )
@@ -872,15 +872,15 @@ function PlayOptions({
     <span className="choice-group">
       <span className="choice-label">
         {label}
-        {legal.cost ? t(`（另外棄 ${legal.cost} 張）`, ` (+${legal.cost} discard)`) : ''}
-        {t('，目標', ': target')}
+        {legal.cost ? t(`（另外棄 ${legal.cost} 張）`, ` (+${legal.cost} discard)`, ` (bỏ thêm ${legal.cost})`) : ''}
+        {t('，目標', ': target', ': mục tiêu')}
       </span>
       {legal.targets.map((q) => {
         const p = v.players[q]
         return (
           <button key={q} type="button" className="primary" onClick={() => (legal.pickCard ? setTarget(q) : legal.second ? setFirst(q) : go(q))}>
-            {q === v.me ? t('自己', 'Yourself') : p.name}
-            <small>{!p.alive ? t('已死亡', 'Dead') : q === v.me ? `♥${p.hp}` : t(`距離 ${p.dist}．♥${p.hp}`, `dist ${p.dist} · ♥${p.hp}`)}</small>
+            {q === v.me ? t('自己', 'Yourself', 'Chính bạn') : p.name}
+            <small>{!p.alive ? t('已死亡', 'Dead', 'Đã chết') : q === v.me ? `♥${p.hp}` : t(`距離 ${p.dist}．♥${p.hp}`, `dist ${p.dist} · ♥${p.hp}`, `cách ${p.dist} · ♥${p.hp}`)}</small>
           </button>
         )
       })}
@@ -889,10 +889,10 @@ function PlayOptions({
 }
 
 const TARGET_LABEL: Partial<Record<AskView['kind'], (name: string, n: number) => string>> = {
-  jesse: (name, n) => t(`從 ${name} 手上拿（${n} 張）`, `Take from ${name} (${n})`),
-  vera: (name) => t(`複製 ${name}`, `Copy ${name}`),
-  evelyn: (name) => t(`對 ${name} 開槍`, `Shoot ${name}`),
-  blood: (name) => t(`給 ${name} 1 點生命`, `Give ${name} 1 life`),
+  jesse: (name, n) => t(`從 ${name} 手上拿（${n} 張）`, `Take from ${name} (${n})`, `Lấy từ ${name} (${n})`),
+  vera: (name) => t(`複製 ${name}`, `Copy ${name}`, `Sao chép ${name}`),
+  evelyn: (name) => t(`對 ${name} 開槍`, `Shoot ${name}`, `Bắn ${name}`),
+  blood: (name) => t(`給 ${name} 1 點生命`, `Give ${name} 1 life`, `Cho ${name} 1 máu`),
 }
 
 /** 需要回答的詢問 */
@@ -908,7 +908,7 @@ function AskPanel({ v, ask, picked, setPicked, act }: { v: GameView; ask: AskVie
       ))}
       {ask.table.map((c) => (
         <button key={c.id} type="button" className="primary" onClick={() => act({ type: 'answer', cards: [c.id] })}>
-          {t(`用場上的【${cN(c.key)}】`, `Use ${cN(c.key)} in play`)}
+          {t(`用場上的【${cN(c.key)}】`, `Use ${cN(c.key)} in play`, `Dùng ${cN(c.key)} trên bàn`)}
         </button>
       ))}
       {ask.options.map((o) => (
@@ -943,7 +943,7 @@ function AskPanel({ v, ask, picked, setPicked, act }: { v: GameView; ask: AskVie
         ))}
         {multi ? (
           <button type="button" className="primary" disabled={picked.length < ask.min || picked.length > ask.max} onClick={() => act({ type: 'answer', opt: 'ok', cards: picked })}>
-            {ask.min === ask.max ? t(`拿這 ${ask.min} 張`, `Take these ${ask.min}`) : t(`拿走選取的 ${picked.length} 張`, `Take the ${picked.length} selected`)}
+            {ask.min === ask.max ? t(`拿這 ${ask.min} 張`, `Take these ${ask.min}`, `Lấy ${ask.min} lá này`) : t(`拿走選取的 ${picked.length} 張`, `Take the ${picked.length} selected`, `Lấy ${picked.length} lá đã chọn`)}
           </button>
         ) : (
           ask.options.map((o) => (
@@ -958,9 +958,9 @@ function AskPanel({ v, ask, picked, setPicked, act }: { v: GameView; ask: AskVie
   if (ask.kind === 'discard') {
     return (
       <div className="choices">
-        <span className="choice-label">{t(`點選下方手牌（${ask.min} 張）`, `Tap ${ask.min} card${ask.min > 1 ? 's' : ''} below`)}</span>
+        <span className="choice-label">{t(`點選下方手牌（${ask.min} 張）`, `Tap ${ask.min} card${ask.min > 1 ? 's' : ''} below`, `Chạm ${ask.min} lá bên dưới`)}</span>
         <button type="button" className="primary" disabled={picked.length !== ask.min} onClick={() => act({ type: 'answer', opt: 'ok', cards: picked })}>
-          {t(`棄掉（已選 ${picked.length} 張）`, `Discard (${picked.length} selected)`)}
+          {t(`棄掉（已選 ${picked.length} 張）`, `Discard (${picked.length} selected)`, `Bỏ (đã chọn ${picked.length})`)}
         </button>
       </div>
     )
@@ -969,8 +969,8 @@ function AskPanel({ v, ask, picked, setPicked, act }: { v: GameView; ask: AskVie
     return (
       <div className="choices">
         <span className="choice-label">
-          {ask.kind === 'ranch' ? t('點選下方要換掉的手牌', 'Tap the cards to swap') : t(`點選下方 ${ask.min} 張要棄的手牌`, `Tap ${ask.min} card${ask.min > 1 ? 's' : ''} to discard`)}
-          {t(`（已選 ${picked.length} 張）`, ` (${picked.length} selected)`)}
+          {ask.kind === 'ranch' ? t('點選下方要換掉的手牌', 'Tap the cards to swap', 'Chạm vào các lá muốn đổi') : t(`點選下方 ${ask.min} 張要棄的手牌`, `Tap ${ask.min} card${ask.min > 1 ? 's' : ''} to discard`, `Chạm ${ask.min} lá để bỏ`)}
+          {t(`（已選 ${picked.length} 張）`, ` (${picked.length} selected)`, ` (đã chọn ${picked.length})`)}
         </span>
         {buttons}
       </div>
@@ -978,7 +978,7 @@ function AskPanel({ v, ask, picked, setPicked, act }: { v: GameView; ask: AskVie
   }
   return (
     <div className="choices">
-      {ask.cards.some((id) => v.hand.some((c) => c.id === id)) && <span className="choice-label">{t('點亮的手牌可以直接打出', 'Highlighted cards can be played directly')}</span>}
+      {ask.cards.some((id) => v.hand.some((c) => c.id === id)) && <span className="choice-label">{t('點亮的手牌可以直接打出', 'Highlighted cards can be played directly', 'Lá được tô sáng có thể đánh ngay')}</span>}
       {buttons}
     </div>
   )
@@ -1001,7 +1001,7 @@ function Log({ v }: { v: GameView }) {
     if (el) el.scrollTop = el.scrollHeight
   }, [v.log.length])
   return (
-    <ol className="log" ref={ref} aria-label={t('遊戲紀錄', 'Game log')} aria-live="polite">
+    <ol className="log" ref={ref} aria-label={t('遊戲紀錄', 'Game log', 'Nhật ký ván')} aria-live="polite">
       {v.log.map((l) => (
         <li
           key={l.seq}
@@ -1028,17 +1028,17 @@ function Result({ v, actions, history }: { v: GameView; actions: ReactNode; hist
   if (mode === 'hidden')
     return (
       <button type="button" className="primary result-reopen" onClick={() => setMode('summary')}>
-        {t('看結算', 'Show results')}
+        {t('看結算', 'Show results', 'Xem kết quả')}
       </button>
     )
   if (mode === 'log')
     return (
-      <div className="overlay" role="dialog" aria-modal="true" aria-label={t('整局紀錄', 'Full game log')}>
+      <div className="overlay" role="dialog" aria-modal="true" aria-label={t('整局紀錄', 'Full game log', 'Nhật ký cả ván')}>
         <div className="result result-log">
           <div className="result-log-head">
-            <h2>{t('整局紀錄', 'Full game log')}</h2>
+            <h2>{t('整局紀錄', 'Full game log', 'Nhật ký cả ván')}</h2>
             <button type="button" className="primary" onClick={() => setMode('summary')}>
-              {t('回到結算', 'Back to results')}
+              {t('回到結算', 'Back to results', 'Về kết quả')}
             </button>
           </div>
           <ol className="log full-log">
@@ -1052,9 +1052,9 @@ function Result({ v, actions, history }: { v: GameView; actions: ReactNode; hist
       </div>
     )
   return (
-    <div className="overlay" role="dialog" aria-modal="true" aria-label={t('遊戲結果', 'Results')}>
+    <div className="overlay" role="dialog" aria-modal="true" aria-label={t('遊戲結果', 'Results', 'Kết quả')}>
       <div className="result">
-        <h2>{won ? t('你贏了', 'You won') : t('你輸了', 'You lost')}</h2>
+        <h2>{won ? t('你贏了', 'You won', 'Bạn thắng') : t('你輸了', 'You lost', 'Bạn thua')}</h2>
         <p>{tx(r.reason)}</p>
         <table>
           <tbody>
@@ -1063,17 +1063,17 @@ function Result({ v, actions, history }: { v: GameView; actions: ReactNode; hist
                 <td>{p.name}</td>
                 <td>{p.role ? roleName(p.role, L()) : ''}</td>
                 <td>{p.character ? chN(p.character) : ''}</td>
-                <td>{r.winners.includes(p.seat) ? t('勝利', 'Won') : p.alive ? '' : t('死亡', 'Dead')}</td>
+                <td>{r.winners.includes(p.seat) ? t('勝利', 'Won', 'Thắng') : p.alive ? '' : t('死亡', 'Dead', 'Đã chết')}</td>
               </tr>
             ))}
           </tbody>
         </table>
         <div className="result-actions">
           <button type="button" onClick={() => setMode('log')}>
-            {t('查看整局紀錄', 'Full game log')}
+            {t('查看整局紀錄', 'Full game log', 'Nhật ký cả ván')}
           </button>
           <button type="button" onClick={() => setMode('hidden')}>
-            {t('看牌桌', 'View table')}
+            {t('看牌桌', 'View table', 'Xem bàn chơi')}
           </button>
           {actions}
         </div>
@@ -1085,7 +1085,7 @@ function Result({ v, actions, history }: { v: GameView; actions: ReactNode; hist
 export function GoldInfo({ n, items }: { n: number; items: { uid: number; key: GoldKey }[] }) {
   return (
     <span className="gold-info">
-      <span className="nugget" title={t('金塊', 'Gold nuggets')}>
+      <span className="nugget" title={t('金塊', 'Gold nuggets', 'Vàng')}>
         {n}
       </span>
       {items.map((x) => (
@@ -1106,8 +1106,8 @@ function ShopPanel({ v, selShop, setSelShop, act }: { v: GameView; selShop: numb
   return (
     <div className="shop">
       <span className="shop-title">
-        {t('商店', 'Shop')}
-        <small>{t(`你有 ${v.myNuggets} 金塊．裝備牌堆 ${v.goldDeck} 張`, `You have ${v.myNuggets} nugget${v.myNuggets === 1 ? '' : 's'} · ${v.goldDeck} in the equipment deck`)}</small>
+        {t('商店', 'Shop', 'Cửa hàng')}
+        <small>{t(`你有 ${v.myNuggets} 金塊．裝備牌堆 ${v.goldDeck} 張`, `You have ${v.myNuggets} nugget${v.myNuggets === 1 ? '' : 's'} · ${v.goldDeck} in the equipment deck`, `Bạn có ${v.myNuggets} vàng · ${v.goldDeck} lá trong chồng trang bị`)}</small>
       </span>
       {items.map((x) => {
         const def = GOLD_DEFS[x.key]
@@ -1122,7 +1122,7 @@ function ShopPanel({ v, selShop, setSelShop, act }: { v: GameView; selShop: numb
             onClick={() => setSelShop(selShop === x.uid ? null : x.uid)}
           >
             <b>{gN(x.key)}</b>
-            <span className="price">{x.free ? t('免費', 'Free') : t(`${def.cost} 金`, `${def.cost} gold`)}</span>
+            <span className="price">{x.free ? t('免費', 'Free', 'Miễn phí') : t(`${def.cost} 金`, `${def.cost} gold`, `${def.cost} vàng`)}</span>
             <small>{gD(x.key)}</small>
           </button>
         )
@@ -1136,7 +1136,7 @@ function ShopPanel({ v, selShop, setSelShop, act }: { v: GameView; selShop: numb
       )}
       {drops.length > 0 && (
         <details className="shop-drops">
-          <summary>{t('付金塊棄掉別人的裝備', 'Pay nuggets to discard someone’s equipment')}</summary>
+          <summary>{t('付金塊棄掉別人的裝備', 'Pay nuggets to discard someone’s equipment', 'Trả vàng để bỏ trang bị của người khác')}</summary>
           <div className="choices">
             {drops.map((l) => (
               <PlayOptions key={l.card} legal={l} v={v} onPlay={act} onCost={() => {}} />
@@ -1167,11 +1167,11 @@ function PlaySheet({
   if (!card) return null
   return (
     <div className="sheet-backdrop" onClick={onClose}>
-      <div className="sheet" role="dialog" aria-modal="true" aria-label={t(`打出【${cN(card.key)}】`, `Play ${cN(card.key)}`)} onClick={(e) => e.stopPropagation()}>
+      <div className="sheet" role="dialog" aria-modal="true" aria-label={t(`打出【${cN(card.key)}】`, `Play ${cN(card.key)}`, `Đánh ${cN(card.key)}`)} onClick={(e) => e.stopPropagation()}>
         <div className="sheet-head">
           <CardFace card={card} small />
           <p>
-            <b>{t(`【${cN(card.key)}】`, `${cN(card.key)}: `)}</b>
+            <b>{t(`【${cN(card.key)}】`, `${cN(card.key)}: `, `${cN(card.key)}: `)}</b>
             {cD(card.key)}
           </p>
         </div>
@@ -1182,7 +1182,7 @@ function PlaySheet({
           {!legal.length && <span className="muted">{whyNot(v, card)}</span>}
         </div>
         <button type="button" className="sheet-close" onClick={onClose}>
-          {t('取消', 'Cancel')}
+          {t('取消', 'Cancel', 'Hủy')}
         </button>
       </div>
     </div>

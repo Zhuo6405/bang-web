@@ -4,6 +4,8 @@ import guide from '../docs/guide.md?raw'
 import spec from '../docs/spec.md?raw'
 import guideEn from '../docs/guide.en.md?raw'
 import specEn from '../docs/spec.en.md?raw'
+import guideVi from '../docs/guide.vi.md?raw'
+import specVi from '../docs/spec.vi.md?raw'
 import { getLang } from '../lang'
 
 export default function DocBody({ which }: { which: 'guide' | 'spec' }) {
@@ -23,7 +25,7 @@ export default function DocBody({ which }: { which: 'guide' | 'spec' }) {
         ),
       }}
     >
-      {getLang() === 'en' ? (which === 'guide' ? guideEn : specEn) : which === 'guide' ? guide : spec}
+      {{ zh: { guide, spec }, en: { guide: guideEn, spec: specEn }, vi: { guide: guideVi, spec: specVi } }[getLang()][which]}
     </Markdown>
   )
 }

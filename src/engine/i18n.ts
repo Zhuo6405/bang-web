@@ -5,13 +5,14 @@ import type { CardKey, GoldKey, Role, Suit } from './types'
  * 雙語文字：引擎產生的訊息同時帶中文和英文，用 SEP 隔開，畫面依語言挑一邊。
  * 英文一律用英式拼法。
  */
-export type Lang = 'zh' | 'en'
+export type Lang = 'zh' | 'en' | 'vi'
 export const SEP = '␞'
-export const bi = (zh: string, en: string) => `${zh}${SEP}${en}`
+/** 中文、英文、越南文（越南文可省略，省略時用英文） */
+export const bi = (zh: string, en: string, vi?: string) => (vi != null ? `${zh}${SEP}${en}${SEP}${vi}` : `${zh}${SEP}${en}`)
 export function pick(s: string, lang: Lang): string {
-  const i = s.indexOf(SEP)
-  if (i < 0) return s
-  return lang === 'en' ? s.slice(i + SEP.length) : s.slice(0, i)
+  if (!s.includes(SEP)) return s
+  const [zh, en, vi] = s.split(SEP)
+  return lang === 'zh' ? zh : lang === 'vi' ? (vi ?? en) : en
 }
 
 export const CARD_EN: Record<CardKey, { name: string; desc: string }> = {
@@ -212,15 +213,206 @@ export const EXP_EN: Record<string, string> = {
 export const AI_NAMES_EN = ['Billy', 'Annie', 'Jack', 'Dorothy', 'Tom', 'Ruby', 'Old Joe', 'Hank', 'Daisy']
 
 // ── 依語言取名稱與說明 ──
-export const cardName = (k: CardKey, l: Lang) => (l === 'en' ? CARD_EN[k].name : CARD_DEFS[k].name)
-export const cardDesc = (k: CardKey, l: Lang) => (l === 'en' ? CARD_EN[k].desc : CARD_DEFS[k].desc)
-export const goldName = (k: GoldKey, l: Lang) => (l === 'en' ? GOLD_EN[k].name : GOLD_DEFS[k].name)
-export const goldDesc = (k: GoldKey, l: Lang) => (l === 'en' ? GOLD_EN[k].desc : GOLD_DEFS[k].desc)
-export const charName = (id: string, l: Lang) => (l === 'en' ? (CHAR_EN[id]?.name ?? id) : (CHAR_BY_ID[id]?.name ?? id))
-export const charText = (id: string, l: Lang) => (l === 'en' ? (CHAR_EN[id]?.text ?? '') : (CHAR_BY_ID[id]?.text ?? ''))
-export const eventName = (id: string, l: Lang) => (l === 'en' ? (EVENT_EN[id]?.name ?? id) : (EVENT_BY_ID[id]?.name ?? id))
-export const eventText = (id: string, l: Lang) => (l === 'en' ? (EVENT_EN[id]?.text ?? '') : (EVENT_BY_ID[id]?.text ?? ''))
-export const roleName = (r: Role, l: Lang) => (l === 'en' ? ROLE_EN[r] : ROLE_NAME[r])
-export const roleGoal = (r: Role, l: Lang) => (l === 'en' ? ROLE_GOAL_EN[r] : ROLE_GOAL[r])
-export const suitName = (s: Suit, l: Lang) => (l === 'en' ? SUIT_EN[s] : SUIT_NAME[s])
-export const expName = (id: string, l: Lang) => (l === 'en' ? (EXP_EN[id] ?? id) : (EXPANSIONS.find((e) => e.id === id)?.name ?? (id === 'base' ? '基本版' : id)))
+// 越南文：名稱沿用英文，說明用越南文
+const latin = (l: Lang) => l !== 'zh'
+export const cardName = (k: CardKey, l: Lang) => (latin(l) ? CARD_EN[k].name : CARD_DEFS[k].name)
+export const cardDesc = (k: CardKey, l: Lang) => (l === 'vi' ? CARD_VI_DESC[k] : l === 'en' ? CARD_EN[k].desc : CARD_DEFS[k].desc)
+export const goldName = (k: GoldKey, l: Lang) => (latin(l) ? GOLD_EN[k].name : GOLD_DEFS[k].name)
+export const goldDesc = (k: GoldKey, l: Lang) => (l === 'vi' ? GOLD_VI_DESC[k] : l === 'en' ? GOLD_EN[k].desc : GOLD_DEFS[k].desc)
+export const charName = (id: string, l: Lang) => (latin(l) ? (CHAR_EN[id]?.name ?? id) : (CHAR_BY_ID[id]?.name ?? id))
+export const charText = (id: string, l: Lang) => (l === 'vi' ? (CHAR_VI[id]?.text ?? '') : l === 'en' ? (CHAR_EN[id]?.text ?? '') : (CHAR_BY_ID[id]?.text ?? ''))
+export const eventName = (id: string, l: Lang) => (latin(l) ? (EVENT_EN[id]?.name ?? id) : (EVENT_BY_ID[id]?.name ?? id))
+export const eventText = (id: string, l: Lang) => (l === 'vi' ? (EVENT_VI[id]?.text ?? '') : l === 'en' ? (EVENT_EN[id]?.text ?? '') : (EVENT_BY_ID[id]?.text ?? ''))
+export const roleName = (r: Role, l: Lang) => (l === 'vi' ? ROLE_VI[r] : l === 'en' ? ROLE_EN[r] : ROLE_NAME[r])
+export const roleGoal = (r: Role, l: Lang) => (l === 'vi' ? ROLE_GOAL_VI[r] : l === 'en' ? ROLE_GOAL_EN[r] : ROLE_GOAL[r])
+export const suitName = (s: Suit, l: Lang) => (l === 'vi' ? SUIT_VI[s] : l === 'en' ? SUIT_EN[s] : SUIT_NAME[s])
+export const expName = (id: string, l: Lang) =>
+  l === 'vi' && id === 'base' ? 'Bản cơ bản' : latin(l) ? (EXP_EN[id] ?? id) : (EXPANSIONS.find((e) => e.id === id)?.name ?? (id === 'base' ? '基本版' : id))
+
+// ── 越南文（Tiếng Việt）：牌名、角色名、事件名沿用官方英文名，說明翻成越南文 ──
+export const CARD_VI_DESC: Record<CardKey, string> = {
+  bang: 'Bắn một người trong tầm. Mỗi lượt chỉ một lần.',
+  missed: 'Đánh khi bị bắn để né phát bắn.',
+  beer: 'Hồi 1 máu (không vượt quá tối đa). Có thể uống khi sắp chết. Vô tác dụng khi chỉ còn hai người.',
+  saloon: 'Mọi người còn sống hồi 1 máu.',
+  stagecoach: 'Rút 2 lá.',
+  wellsfargo: 'Rút 3 lá.',
+  store: 'Lật số lá bằng số người còn sống; bắt đầu từ bạn, mỗi người lấy một lá.',
+  gatling: 'Bắn mỗi người khác một phát (không tính tầm và giới hạn BANG!).',
+  indians: 'Mỗi người khác phải bỏ 1 BANG! hoặc mất 1 máu.',
+  duel: 'Thách một người: bắt đầu từ họ, lần lượt bỏ BANG!; ai không bỏ được thì mất 1 máu.',
+  panic: 'Lấy một lá (trên tay hoặc trên bàn) của người ở khoảng cách 1.',
+  catbalou: 'Bắt một người bất kỳ bỏ một lá (trên tay hoặc trên bàn).',
+  barrel: 'Khi bị bắn, có thể rút phán định: ra Cơ thì tính như Missed!.',
+  dynamite: 'Đặt trước mặt bạn. Đầu lượt rút phán định: Bích 2–9 thì nổ, mất 3 máu; nếu không thì chuyền cho người kế.',
+  jail: 'Đặt trước mặt bất kỳ ai trừ Cảnh sát trưởng. Đầu lượt họ rút phán định: ra Cơ thì thoát, nếu không thì mất lượt.',
+  mustang: 'Người khác nhìn bạn xa thêm 1.',
+  scope: 'Bạn nhìn người khác gần hơn 1.',
+  volcanic: 'Tầm 1. Được đánh bao nhiêu BANG! cũng được.',
+  schofield: 'Tầm 2.',
+  remington: 'Tầm 3.',
+  carabine: 'Tầm 4.',
+  winchester: 'Tầm 5.',
+  punch: 'Bắn một người ở khoảng cách 1 (không tính là BANG! của bạn).',
+  dodge: 'Tính như Missed!, rồi rút 1 lá.',
+  ragtime: 'Bỏ thêm 1 lá: lấy một lá của bất kỳ ai (không tính khoảng cách).',
+  brawl: 'Bỏ thêm 1 lá: mỗi người khác bỏ một lá do bạn chọn (trên tay hoặc trên bàn).',
+  springfield: 'Bỏ thêm 1 lá: bắn bất kỳ ai (không tính khoảng cách, không tính là BANG!).',
+  tequila: 'Bỏ thêm 1 lá: một người bất kỳ (kể cả bạn) hồi 1 máu.',
+  whisky: 'Bỏ thêm 1 lá: bạn hồi 2 máu.',
+  binocular: 'Bạn nhìn người khác gần hơn 1.',
+  hideout: 'Người khác nhìn bạn xa thêm 1.',
+  bible: 'Lá xanh lá: bỏ khi bị bắn để tính như Missed!, và rút 1 lá.',
+  hat: 'Lá xanh lá: bỏ khi bị bắn để tính như Missed!.',
+  ironplate: 'Lá xanh lá: bỏ khi bị bắn để tính như Missed!.',
+  sombrero: 'Lá xanh lá: bỏ khi bị bắn để tính như Missed!.',
+  knife: 'Lá xanh lá: bỏ để bắn một người ở khoảng cách 1.',
+  derringer: 'Lá xanh lá: bỏ để bắn một người ở khoảng cách 1 và rút 1 lá.',
+  canteen: 'Lá xanh lá: bỏ để hồi 1 máu.',
+  cancan: 'Lá xanh lá: bỏ để dùng như Cat Balou.',
+  conestoga: 'Lá xanh lá: bỏ để lấy một lá của bất kỳ ai (không tính khoảng cách).',
+  pepperbox: 'Lá xanh lá: bỏ để bắn một người trong tầm (không tính là BANG!).',
+  buffalo: 'Lá xanh lá: bỏ để bắn bất kỳ ai (không tính khoảng cách).',
+  howitzer: 'Lá xanh lá: bỏ để dùng như Gatling.',
+  pony: 'Lá xanh lá: bỏ để rút 3 lá.',
+  ghostcard: 'Đặt trước mặt một người đã chết: họ trở lại dưới dạng hồn ma, không thể bị thương hay hồi máu. Nếu lá này bị lấy đi, họ lại rời bàn.',
+  lemat: 'Tầm 1. Trong lượt của bạn, lá nào trên tay cũng có thể dùng như BANG!.',
+  rattlesnake: 'Đặt trước mặt bất kỳ ai: đầu lượt họ rút phán định — ra Bích thì mất 1 máu.',
+  shotgun: 'Tầm 1. Mỗi người bạn làm bị thương phải bỏ 1 lá trên tay.',
+  bounty: 'Đặt trước mặt bất kỳ ai: ai bắn trúng họ bằng BANG! được rút 1 lá.',
+  lastcall: 'Hồi 1 máu (vẫn có tác dụng khi chỉ còn hai người).',
+  tomahawk: 'Tấn công một người ở khoảng cách tối đa 2 (chỉ Missed! mới né được).',
+  tornado: 'Mọi người (kể cả bạn) bỏ 1 lá rồi rút 2 lá.',
+  fanning: 'Tính là BANG! của bạn: bắn mục tiêu, rồi bắn thêm một người ở khoảng cách 1 với họ.',
+  aim: 'Đánh cùng một lá BANG!: nếu trúng, mục tiêu mất 2 máu.',
+  bandidos: 'Mỗi người khác bỏ 2 lá (chỉ có 1 thì bỏ 1) hoặc mất 1 máu.',
+  escape: 'Đánh ngoài lượt: tránh hiệu ứng của một lá nâu nhắm vào bạn (trừ BANG!).',
+  poker: 'Mỗi người khác bỏ 1 lá; nếu không có quân Át, bạn lấy tối đa 2 lá trong số đó.',
+  backfire: 'Tính như Missed!, và bắn trả người đã bắn.',
+}
+
+export const GOLD_VI_DESC: Record<GoldKey, string> = {
+  shotglass: 'Một người bất kỳ (kể cả bạn) hồi 1 máu.',
+  bottle: 'Dùng như Panic!, Beer hoặc BANG! (không tính là BANG! của bạn).',
+  pardner: 'Dùng như General Store, Duel hoặc Cat Balou.',
+  goldrushcard: 'Kết thúc lượt ngay, hồi đầy máu, rồi chơi thêm một lượt.',
+  rum: 'Rút phán định 4 lá; mỗi chất khác nhau hồi 1 máu.',
+  unionpacific: 'Rút 4 lá.',
+  calumet: 'Lá chất Rô người khác đánh không có tác dụng với bạn (trừ Duel).',
+  gunbelt: 'Cuối lượt được giữ tối đa 8 lá.',
+  horseshoe: 'Khi rút phán định, lật 2 lá và chọn lá có lợi.',
+  pickaxe: 'Rút thêm 1 lá trong giai đoạn rút bài.',
+  wanted: 'Đặt trước mặt người khác: ai giết họ được rút 2 lá và nhận 1 vàng.',
+  goldpan: 'Trong lượt của bạn, trả 1 vàng để rút 1 lá, tối đa 2 lần mỗi lượt.',
+  boots: 'Mỗi máu bị mất được rút 1 lá (trừ máu cuối).',
+  luckycharm: 'Mỗi máu bị mất được nhận 1 vàng (trừ máu cuối).',
+  rucksack: 'Trả 2 vàng để hồi 1 máu (cả khi sắp chết).',
+}
+
+export const CHAR_VI: Record<string, { text: string }> = {
+  bart: { text: 'Mỗi lần mất 1 máu, rút 1 lá.' },
+  blackjack: { text: 'Khi rút bài, lật lá thứ hai: nếu là Cơ hoặc Rô thì rút thêm 1 lá.' },
+  calamity: { text: 'Có thể dùng BANG! như Missed! và ngược lại.' },
+  gringo: { text: 'Mỗi máu bị một người làm mất, lấy ngẫu nhiên 1 lá trên tay người đó.' },
+  jesse: { text: 'Có thể rút lá đầu tiên ngẫu nhiên từ tay bất kỳ người chơi nào.' },
+  jourdonnais: { text: 'Luôn được tính như có Barrel; có thêm Barrel thật thì được rút phán định hai lần.' },
+  kit: { text: 'Xem 3 lá trên cùng, giữ 2 lá và đặt lá còn lại lên trên.' },
+  lucky: { text: 'Mỗi lần rút phán định, lật 2 lá và chọn lá mình muốn.' },
+  paul: { text: 'Người khác nhìn anh xa thêm 1.' },
+  pedro: { text: 'Có thể lấy lá đầu tiên từ trên cùng chồng bài bỏ.' },
+  rose: { text: 'Cô nhìn người khác gần hơn 1.' },
+  sid: { text: 'Bất cứ lúc nào cũng có thể bỏ 2 lá để hồi 1 máu.' },
+  slab: { text: 'BANG! của anh cần 2 Missed! mới né được.' },
+  suzy: { text: 'Ngay khi hết bài trên tay, cô rút 1 lá.' },
+  vulture: { text: 'Khi có người chết, anh lấy toàn bộ bài trên tay và trên bàn của người đó.' },
+  willy: { text: 'Được đánh bao nhiêu BANG! cũng được.' },
+  pixie: { text: 'Rút 3 lá trong giai đoạn rút bài.' },
+  tequilajoe: { text: 'Beer hồi 2 máu cho anh.' },
+  greg: { text: 'Khi người khác chết, anh hồi 2 máu.' },
+  herb: { text: 'Khi người khác chết, anh rút 2 lá.' },
+  elena: { text: 'Có thể dùng bất kỳ lá nào trên tay như Missed!.' },
+  bill: { text: 'Rút 1 lá, cộng thêm 1 lá cho mỗi máu đã mất.' },
+  molly: { text: 'Mỗi lần đánh bài ngoài lượt, cô rút 1 lá.' },
+  apache: { text: 'Lá chất Rô người khác đánh không có tác dụng với anh (trừ Duel).' },
+  sean: { text: 'Cuối lượt được giữ tối đa 10 lá.' },
+  belle: { text: 'Trong lượt của cô, bài trên bàn của người khác mất tác dụng.' },
+  vera: { text: 'Đầu lượt, cô sao chép năng lực của một người còn sống đến lượt sau.' },
+  chuck: { text: 'Trong lượt của mình có thể mất 1 máu để rút 2 lá (không phải máu cuối).' },
+  pat: { text: 'Thay vì rút bài, có thể lấy một lá trên bàn của bất kỳ ai.' },
+  jose: { text: 'Trong lượt của mình có thể bỏ 1 lá xanh dương để rút 2 lá, tối đa 2 lần mỗi lượt.' },
+  doc: { text: 'Mỗi lượt một lần, bỏ 2 lá để bắn một người trong tầm (không tính là BANG!).' },
+  donbell: { text: 'Cuối lượt rút phán định: ra Cơ hoặc Rô thì chơi thêm một lượt (chỉ một lần).' },
+  dutch: { text: 'Rút 2 lá, giữ 1, bỏ 1 và nhận 1 vàng.' },
+  jacky: { text: 'Trong lượt của mình có thể trả 2 vàng để bắn một người trong tầm mà không cần bài.' },
+  josh: { text: 'Trong lượt của mình có thể trả 2 vàng để rút lá trang bị trên cùng.' },
+  yto: { text: 'Mỗi khi có người đánh Beer, cô rút 1 lá.' },
+  luzena: { text: 'Mỗi lượt được mua một trang bị rẻ hơn 1 vàng.' },
+  raddie: { text: 'Trong lượt của mình có thể trả 1 vàng để rút 1 lá, tối đa 2 lần mỗi lượt.' },
+  simeon: { text: 'Mỗi máu bị mất được nhận 1 vàng.' },
+  blackflower: { text: 'Mỗi lượt một lần, có thể đánh một lá chất Chuồn như một BANG! thêm.' },
+  colorado: { text: 'Khi đánh BANG!, anh rút phán định: ra Bích thì không thể né.' },
+  ringer: { text: 'Mỗi lượt một lần, có thể đánh BANG! như Gatling.' },
+  evelyn: { text: 'Mỗi lá rút ít đi trong giai đoạn rút bài, cô được bắn một người khác trong tầm.' },
+  henry: { text: 'Ai lấy hoặc bỏ bài của anh (trên tay hay trên bàn) sẽ bị anh bắn.' },
+  lemonade: { text: 'Khi người khác uống Beer, anh có thể bỏ 1 lá để cũng hồi 1 máu.' },
+  mick: { text: 'Khi bị một lá nâu (không phải BANG!) nhắm vào, có thể né bằng Missed!.' },
+  tuco: { text: 'Nếu không có lá xanh dương trên bàn, anh rút thêm 2 lá.' },
+  bigspencer: { text: 'Chỉ bắt đầu với 5 lá trên tay. Không thể đánh Missed!.' },
+  flint: { text: 'Mỗi lượt một lần, đổi 1 lá trên tay lấy 2 lá ngẫu nhiên của người khác.' },
+  gary: { text: 'Anh lấy những lá thừa người khác bỏ cuối lượt của họ.' },
+  greygory: { text: 'Đầu lượt rút ngẫu nhiên 2 nhân vật và có năng lực của họ đến lượt sau.' },
+  johnpain: { text: 'Khi có ít hơn 6 lá trên tay, anh lấy mọi lá được lật khi rút phán định.' },
+  lee: { text: 'Trong lượt của mình có thể bỏ 1 BANG! để lặp lại hiệu ứng của lá nâu vừa đánh.' },
+  teren: { text: 'Khi sắp chết, anh rút phán định: nếu không phải Bích thì còn 1 máu và rút 1 lá.' },
+  youl: { text: 'Đầu lượt, ai có nhiều bài trên tay hơn anh phải đưa anh 1 lá.' },
+}
+
+export const EVENT_VI: Record<string, { text: string }> = {
+  blessing: { text: 'Mọi lá bài được tính là chất Cơ.' },
+  curse: { text: 'Mọi lá bài được tính là chất Bích.' },
+  ghosttown: { text: 'Người đã chết trở lại dưới dạng hồn ma trong lượt của họ: rút 3 lá, không thể bị thương, rời bàn khi hết lượt.' },
+  goldrush: { text: 'Lượt chơi đi ngược chiều kim đồng hồ.' },
+  daltons: { text: 'Khi lật ra, ai có lá xanh dương trên bàn phải bỏ một lá trong số đó.' },
+  doctor: { text: 'Khi lật ra, những người ít máu nhất mỗi người hồi 1 máu.' },
+  reverend: { text: 'Không được đánh Beer.' },
+  train: { text: 'Rút thêm 1 lá trong giai đoạn rút bài.' },
+  hangover: { text: 'Mọi nhân vật mất năng lực.' },
+  sermon: { text: 'Không được đánh BANG! trong lượt của chính mình.' },
+  thirst: { text: 'Chỉ rút 1 lá trong giai đoạn rút bài.' },
+  shootout: { text: 'Mỗi lượt được đánh 2 lá BANG!.' },
+  handcuffs: { text: 'Sau khi rút bài, chọn một chất: lượt này chỉ được đánh bài chất đó.' },
+  newidentity: { text: 'Đầu lượt có thể đổi sang nhân vật còn lại; nếu đổi thì bắt đầu lại với 2 máu.' },
+  highnoon: { text: 'Mỗi người mất 1 máu vào đầu lượt của mình.' },
+  ambush: { text: 'Khoảng cách cơ bản giữa hai người bất kỳ là 1.' },
+  sniper: { text: 'Trong lượt có thể bỏ cùng lúc 2 BANG!: phát bắn cần 2 Missed! mới né được (tính là BANG! của bạn).' },
+  deadman: { text: 'Người chết đầu tiên trở lại trong lượt của họ với 2 máu và 2 lá.' },
+  blood: { text: 'Đầu lượt có thể mất 1 máu (không phải máu cuối) để người khác hồi 1 máu.' },
+  judge: { text: 'Không được đặt bài trước mặt bất kỳ ai (không trang bị, không Jail).' },
+  lasso: { text: 'Bài trên bàn không có tác dụng.' },
+  law: { text: 'Lật lá thứ hai khi rút; nếu đánh được thì phải đánh nó trước trong lượt này.' },
+  liquor: { text: 'Có thể bỏ lượt rút bài để hồi 1 máu.' },
+  mine: { text: 'Rút bài từ chồng bài bỏ; bài bỏ cuối lượt được đặt lên trên chồng bài.' },
+  peyote: { text: 'Thay vì rút bài, đoán lá tiếp theo đỏ hay đen: đúng thì giữ và đoán tiếp, sai thì dừng.' },
+  ranch: { text: 'Sau khi rút bài, có thể bỏ bao nhiêu lá tùy ý và rút lại bấy nhiêu.' },
+  ricochet: { text: 'Có thể đánh BANG! vào một lá trên bàn của bất kỳ ai: nếu chủ lá không đánh Missed!, lá đó bị bỏ.' },
+  roulette: { text: 'Khi lật ra, bắt đầu từ Cảnh sát trưởng mỗi người bỏ 1 Missed!; ai không bỏ được mất 2 máu.' },
+  vendetta: { text: 'Cuối lượt rút phán định: ra Cơ thì chơi thêm một lượt (chỉ một lần).' },
+  fistful: { text: 'Đầu lượt, bạn bị bắn một phát cho mỗi lá trên tay.' },
+  boneorchard: { text: 'Khi lật ra, mọi người đã chết trở lại với 1 máu; vai trò được chia lại giữa họ.' },
+  darling: { text: 'Đầu lượt, bỏ toàn bộ bài trên tay rồi rút lại bấy nhiêu lá.' },
+  helena: { text: 'Khi lật ra, rút phán định: ra Cơ hoặc Rô thì vai trò của mọi người còn sống trừ Cảnh sát trưởng được chia lại.' },
+  susanna: { text: 'Mỗi lượt phải đánh ít nhất 3 lá, nếu không mất 1 máu.' },
+  showdown: { text: 'Lá nào cũng có thể đánh như BANG!, và BANG! có thể đánh như Missed!.' },
+  sacagaway: { text: 'Mọi người chơi với bài trên tay để ngửa.' },
+  wildwestshow: { text: 'Mục tiêu của mọi người trở thành: là người cuối cùng còn đứng!' },
+}
+
+export const ROLE_VI: Record<Role, string> = { sheriff: 'Cảnh sát trưởng', deputy: 'Phó cảnh sát', outlaw: 'Tội phạm', renegade: 'Kẻ phản bội' }
+export const ROLE_GOAL_VI: Record<Role, string> = {
+  sheriff: 'Tiêu diệt mọi Tội phạm và Kẻ phản bội.',
+  deputy: 'Bảo vệ Cảnh sát trưởng, tiêu diệt mọi Tội phạm và Kẻ phản bội.',
+  outlaw: 'Giết Cảnh sát trưởng.',
+  renegade: 'Là người cuối cùng còn sống (cuối cùng phải thắng Cảnh sát trưởng một chọi một).',
+}
+export const SUIT_VI: Record<Suit, string> = { S: 'Bích', H: 'Cơ', D: 'Rô', C: 'Chuồn' }
+export const AI_NAMES_VI = ['An', 'Bình', 'Châu', 'Dũng', 'Hà', 'Khoa', 'Lan', 'Minh', 'Tú']

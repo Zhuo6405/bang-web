@@ -24,18 +24,18 @@ export function DocsButtons() {
   return (
     <span className="docs-btns">
       <button type="button" className="ghost" onClick={() => setOpen('guide')}>
-        {t('遊玩說明', 'How to play')}
+        {t('遊玩說明', 'How to play', 'Cách chơi')}
       </button>
       <button type="button" className="ghost" onClick={() => setOpen('spec')}>
-        {t('規格書', 'Specification')}
+        {t('規格書', 'Specification', 'Đặc tả')}
       </button>
       {open && (
-        <div className="overlay doc-overlay" role="dialog" aria-modal="true" aria-label={open === 'guide' ? t('遊玩說明', 'How to play') : t('規格書', 'Specification')} onClick={() => setOpen(null)}>
+        <div className="overlay doc-overlay" role="dialog" aria-modal="true" aria-label={open === 'guide' ? t('遊玩說明', 'How to play', 'Cách chơi') : t('規格書', 'Specification', 'Đặc tả')} onClick={() => setOpen(null)}>
           <article className="doc" onClick={(e) => e.stopPropagation()}>
-            <button type="button" className="doc-close" onClick={() => setOpen(null)} aria-label={t('關閉', 'Close')}>
-              {t('關閉', 'Close')}
+            <button type="button" className="doc-close" onClick={() => setOpen(null)} aria-label={t('關閉', 'Close', 'Đóng')}>
+              {t('關閉', 'Close', 'Đóng')}
             </button>
-            <Suspense fallback={<p>{t('載入中…', 'Loading…')}</p>}>
+            <Suspense fallback={<p>{t('載入中…', 'Loading…', 'Đang tải…')}</p>}>
               <DocBody which={open} />
             </Suspense>
           </article>

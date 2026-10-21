@@ -19,8 +19,8 @@ export function ChatPanel({ chat, me, say }: { chat: ChatMsg[]; me: string; say:
   }
   return (
     <div className="chat">
-      <ol className="chat-list" ref={ref} aria-label={t('聊天', 'Chat')} aria-live="polite">
-        {chat.length === 0 && <li className="chat-empty">{t('還沒有人說話。打聲招呼吧。', 'Nobody has said anything yet. Say hello.')}</li>}
+      <ol className="chat-list" ref={ref} aria-label={t('聊天', 'Chat', 'Trò chuyện')} aria-live="polite">
+        {chat.length === 0 && <li className="chat-empty">{t('還沒有人說話。打聲招呼吧。', 'Nobody has said anything yet. Say hello.', 'Chưa có ai nói gì. Chào mọi người đi.')}</li>}
         {chat.map((m) => (
           <li key={m.id} className={m.system ? 'is-system' : m.clientId === me ? 'is-me' : ''}>
             {!m.system && <b>{tx(m.name)}</b>}
@@ -35,9 +35,9 @@ export function ChatPanel({ chat, me, say }: { chat: ChatMsg[]; me: string; say:
           send()
         }}
       >
-        <input value={text} maxLength={300} onChange={(e) => setText(e.target.value)} placeholder={t('輸入訊息，Enter 送出', 'Type a message, Enter to send')} aria-label={t('聊天訊息', 'Chat message')} />
+        <input value={text} maxLength={300} onChange={(e) => setText(e.target.value)} placeholder={t('輸入訊息，Enter 送出', 'Type a message, Enter to send', 'Nhập tin nhắn, Enter để gửi')} aria-label={t('聊天訊息', 'Chat message', 'Tin nhắn')} />
         <button type="submit" disabled={!text.trim()}>
-          {t('送出', 'Send')}
+          {t('送出', 'Send', 'Gửi')}
         </button>
       </form>
     </div>
@@ -50,9 +50,9 @@ export function VoiceControls({ voice, speakers }: { voice: VoiceMesh | null; sp
   if (!voice.on) {
     return (
       <span className="voice">
-        <button type="button" onClick={() => void voice.enable()} title={t('開啟麥克風加入語音', 'Turn on your microphone to join voice')}>
-          {t('加入語音', 'Join voice')}
-          {speakers > 0 ? t(`（${speakers} 人在線）`, ` (${speakers} on)`) : ''}
+        <button type="button" onClick={() => void voice.enable()} title={t('開啟麥克風加入語音', 'Turn on your microphone to join voice', 'Bật micro để tham gia trò chuyện thoại')}>
+          {t('加入語音', 'Join voice', 'Tham gia thoại')}
+          {speakers > 0 ? t(`（${speakers} 人在線）`, ` (${speakers} on)`, ` (${speakers} người)`) : ''}
         </button>
         {voice.error && <span className="voice-err">{voice.error}</span>}
       </span>
@@ -61,12 +61,12 @@ export function VoiceControls({ voice, speakers }: { voice: VoiceMesh | null; sp
   return (
     <span className="voice is-on">
       <span className="voice-dot" aria-hidden />
-      <span className="voice-n">{t(`語音 ${voice.connectedCount + 1} 人`, `Voice: ${voice.connectedCount + 1}`)}</span>
+      <span className="voice-n">{t(`語音 ${voice.connectedCount + 1} 人`, `Voice: ${voice.connectedCount + 1}`, `Thoại: ${voice.connectedCount + 1}`)}</span>
       <button type="button" onClick={() => voice.setMuted(!voice.muted)} aria-pressed={voice.muted}>
-        {voice.muted ? t('取消靜音', 'Unmute') : t('靜音', 'Mute')}
+        {voice.muted ? t('取消靜音', 'Unmute', 'Bật tiếng') : t('靜音', 'Mute', 'Tắt tiếng')}
       </button>
       <button type="button" className="ghost" onClick={() => voice.disable()}>
-        {t('離開語音', 'Leave voice')}
+        {t('離開語音', 'Leave voice', 'Rời thoại')}
       </button>
     </span>
   )

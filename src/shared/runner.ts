@@ -64,7 +64,7 @@ export class GameRunner {
 
   /** 真人送出動作；回傳錯誤訊息或 null */
   submit(seat: number, a: Action): string | null {
-    if (this.disposed) return bi('遊戲已結束', 'The game is over')
+    if (this.disposed) return bi('遊戲已結束', 'The game is over', 'Ván đã kết thúc')
     try {
       this.state = applyAction(this.state, seat, a)
     } catch (e) {

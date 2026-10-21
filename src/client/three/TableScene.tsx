@@ -115,13 +115,13 @@ function apply(d: Director, f: Fx, t: number) {
         d.aims.set(f.from, { t0: t, shots: [{ target: f.to, at }], until: at + GUN.hold })
       }
       d.shots.push({ id: uid++, from: f.from, to: f.to, t0: at })
-      pop(f.from, tr('砰！', 'BANG!'), '#ffcf5a', at - t)
+      pop(f.from, tr('砰！', 'BANG!', 'BANG!'), '#ffcf5a', at - t)
       return
     }
     case 'miss': {
       if (f.to == null) return
       const dt = afterShot(d, f, t)
-      pop(f.to, tr('射偏了！', 'Missed!'), '#cfe8ff', dt)
+      pop(f.to, tr('射偏了！', 'Missed!', 'Missed!'), '#cfe8ff', dt)
       d.dodge.set(f.to, t + dt)
       return
     }
@@ -139,14 +139,14 @@ function apply(d: Director, f: Fx, t: number) {
       return
     case 'explode':
       if (f.to == null) return
-      pop(f.to, tr('轟！', 'BOOM!'), '#ff8a2a')
+      pop(f.to, tr('轟！', 'BOOM!', 'BÙM!'), '#ff8a2a')
       d.flashes.push({ id: uid++, seat: f.to, kind: 'explode', t0: t })
       return
     case 'death':
-      if (f.to != null) pop(f.to, tr('倒下', 'Down'), '#d8d0c0')
+      if (f.to != null) pop(f.to, tr('倒下', 'Down', 'Gục'), '#d8d0c0')
       return
     case 'check':
-      if (f.to != null && f.card) pop(f.to, f.ok ? tr('判定成功', 'Draw! passed') : tr('判定失敗', 'Draw! failed'), f.ok ? '#9fe0a0' : '#e0a09f')
+      if (f.to != null && f.card) pop(f.to, f.ok ? tr('判定成功', 'Draw! passed', 'Phán định: đạt') : tr('判定失敗', 'Draw! failed', 'Phán định: trượt'), f.ok ? '#9fe0a0' : '#e0a09f')
       return
   }
 }
@@ -833,7 +833,7 @@ function GearTag({ card, gold, y }: { card: Card | null; gold: GoldKey | null; y
   if (card) {
     const d = CARD_DEFS[card.key]
     const n = cardName(card.key, getLang())
-    text = d.range ? tr(`${n}．射程${d.range}`, `${n} · range ${d.range}`) : n
+    text = d.range ? tr(`${n}．射程${d.range}`, `${n} · range ${d.range}`, `${n} · tầm ${d.range}`) : n
     bg = card.key === 'jail' ? '#b9b9b9' : card.key === 'dynamite' ? '#f08a6a' : d.colour === 'green' ? '#a9dc8f' : d.range ? '#f2c75c' : '#a9c9f2'
   } else if (gold) {
     text = goldName(gold, getLang())
@@ -1006,7 +1006,7 @@ function JailCage({ theta }: { theta: number }) {
   })
   const bars = 14
   const R = 0.78
-  const tex = tagTexture(tr('監獄', 'JAIL'), '#b9b9b9')
+  const tex = tagTexture(tr('監獄', 'JAIL', 'JAIL'), '#b9b9b9')
   return (
     <group position={pos}>
       <group ref={g}>
@@ -1064,13 +1064,13 @@ function Seat({
   const jailed = p.alive && p.table.some((c) => c.key === 'jail')
   const winner = !!v.result?.winners.includes(p.seat)
   const marks: { text: string; cls: string }[] = []
-  if (dead) marks.push({ text: tr('死亡', 'Dead'), cls: 'm-dead' })
-  if (p.ghost) marks.push({ text: tr('幽靈', 'Ghost'), cls: 'm-ai' })
-  if (v.active === p.seat && p.alive) marks.push({ text: tr('回合中', 'Their turn'), cls: 'm-turn' })
-  if (p.table.some((c) => c.key === 'jail')) marks.push({ text: tr('監獄', 'Jail'), cls: 'm-lock' })
-  if (p.table.some((c) => c.key === 'dynamite')) marks.push({ text: tr('炸藥', 'Dynamite'), cls: 'm-divert' })
-  if (acting) marks.push({ text: tr('行動中', 'Acting'), cls: 'm-wait' })
-  if (aiControlled && p.alive) marks.push({ text: tr('斷線．AI 代打', 'Offline · computer playing'), cls: 'm-ai' })
+  if (dead) marks.push({ text: tr('死亡', 'Dead', 'Đã chết'), cls: 'm-dead' })
+  if (p.ghost) marks.push({ text: tr('幽靈', 'Ghost', 'Hồn ma'), cls: 'm-ai' })
+  if (v.active === p.seat && p.alive) marks.push({ text: tr('回合中', 'Their turn', 'Đang đến lượt'), cls: 'm-turn' })
+  if (p.table.some((c) => c.key === 'jail')) marks.push({ text: tr('監獄', 'Jail', 'Jail'), cls: 'm-lock' })
+  if (p.table.some((c) => c.key === 'dynamite')) marks.push({ text: tr('炸藥', 'Dynamite', 'Dynamite'), cls: 'm-divert' })
+  if (acting) marks.push({ text: tr('行動中', 'Acting', 'Đang hành động'), cls: 'm-wait' })
+  if (aiControlled && p.alive) marks.push({ text: tr('斷線．AI 代打', 'Offline · computer playing', 'Mất kết nối · máy chơi thay'), cls: 'm-ai' })
   return (
     <group>
       <group position={pos} rotation-y={theta + Math.PI}>
@@ -1106,20 +1106,20 @@ export function PlateBody({ p, v, me, ch, marks }: { p: PublicPlayer; v: GameVie
     <>
       <div className="plate-head">
         <b>{p.name}</b>
-        {me && <span className="seat-you">{tr('你', 'You')}</span>}
-        {p.isAI && <span className="seat-ai">{tr('電腦', 'CPU')}</span>}
-        <span className="plate-hand">{tr(`手牌 ${p.handCount}`, `Cards ${p.handCount}`)}</span>
+        {me && <span className="seat-you">{tr('你', 'You', 'Bạn')}</span>}
+        {p.isAI && <span className="seat-ai">{tr('電腦', 'CPU', 'Máy')}</span>}
+        <span className="plate-hand">{tr(`手牌 ${p.handCount}`, `Cards ${p.handCount}`, `Bài ${p.handCount}`)}</span>
       </div>
-      <div className="plate-char" onClick={() => window.dispatchEvent(new CustomEvent('bang-inspect', { detail: p.seat }))} title={tr('點一下看角色能力與裝備', 'Tap to see abilities and equipment')}>
-        {ch ?? tr('挑選角色中', 'Choosing a character')}
-        {ch && <span className="plate-info">{tr('能力', 'Info')}</span>}
+      <div className="plate-char" onClick={() => window.dispatchEvent(new CustomEvent('bang-inspect', { detail: p.seat }))} title={tr('點一下看角色能力與裝備', 'Tap to see abilities and equipment', 'Chạm để xem năng lực và trang bị')}>
+        {ch ?? tr('挑選角色中', 'Choosing a character', 'Đang chọn nhân vật')}
+        {ch && <span className="plate-info">{tr('能力', 'Info', 'Chi tiết')}</span>}
         {p.role && <span className={`role r-${p.role}`}>{roleName(p.role, getLang())}</span>}
       </div>
-      <div className="plate-hp" aria-label={tr(`生命 ${p.hp} / ${p.maxHp}`, `Life ${p.hp} / ${p.maxHp}`)}>
+      <div className="plate-hp" aria-label={tr(`生命 ${p.hp} / ${p.maxHp}`, `Life ${p.hp} / ${p.maxHp}`, `Máu ${p.hp} / ${p.maxHp}`)}>
         {Array.from({ length: p.maxHp }, (_, i) => (
           <span key={i} className={i < p.hp ? 'bullet on' : 'bullet'} />
         ))}
-        {!me && p.alive && v.players[v.me].alive && p.dist > 0 && <span className={`plate-dist ${p.dist <= v.myRange ? 'in-range' : ''}`}>{tr(`距離 ${p.dist}`, `Dist ${p.dist}`)}</span>}
+        {!me && p.alive && v.players[v.me].alive && p.dist > 0 && <span className={`plate-dist ${p.dist <= v.myRange ? 'in-range' : ''}`}>{tr(`距離 ${p.dist}`, `Dist ${p.dist}`, `Cách ${p.dist}`)}</span>}
       </div>
       {p.table.length > 0 && (
         <div className="plate-gear">
@@ -1141,8 +1141,8 @@ export function PlateBody({ p, v, me, ch, marks }: { p: PublicPlayer; v: GameVie
         </div>
       )}
       {p.openHand && (
-        <div className="plate-open" title={tr('薩卡加維亞：手牌公開', 'Sacagaway: hand revealed')}>
-          {p.openHand.map((c) => cardName(c.key, getLang())).join(tr('、', ', ')) || tr('沒有手牌', 'No cards')}
+        <div className="plate-open" title={tr('薩卡加維亞：手牌公開', 'Sacagaway: hand revealed', 'Sacagaway: bài trên tay để ngửa')}>
+          {p.openHand.map((c) => cardName(c.key, getLang())).join(tr('、', ', ', ', ')) || tr('沒有手牌', 'No cards', 'Không có bài')}
         </div>
       )}
       {marks.length > 0 && (

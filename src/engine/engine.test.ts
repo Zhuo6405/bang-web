@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildCards, CARD_DEFS, CHARACTERS, EVENTS } from './data'
-import { CARD_EN, CHAR_EN, EVENT_EN, SEP } from './i18n'
+import { CARD_EN, CARD_VI_DESC, CHAR_EN, CHAR_VI, EVENT_EN, EVENT_VI, SEP } from './i18n'
 import { decide } from '../ai/ai'
 import { applyAction, distance, getDecisions, legalPlays, startGame } from './engine'
 import { makeConfig, playOut } from './sim'
@@ -362,8 +362,11 @@ describe('雙語', () => {
     for (const k of Object.keys(CARD_DEFS)) expect(CARD_EN[k as CardKey]?.name, k).toBeTruthy()
     for (const c of CHARACTERS) expect(CHAR_EN[c.id]?.text, c.id).toBeTruthy()
     for (const e of EVENTS) expect(EVENT_EN[e.id]?.text, e.id).toBeTruthy()
+    for (const k of Object.keys(CARD_DEFS)) expect(CARD_VI_DESC[k as CardKey], k).toBeTruthy()
+    for (const c of CHARACTERS) expect(CHAR_VI[c.id]?.text, c.id).toBeTruthy()
+    for (const e of EVENTS) expect(EVENT_VI[e.id]?.text, e.id).toBeTruthy()
   })
-  it('整局的紀錄、詢問、按鈕都同時有中文和英文', () => {
+  it('整局的紀錄、詢問、按鈕都同時有中文、英文和越南文', () => {
     const all = ['dodge_city', 'high_noon', 'fistful', 'wild_west_show', 'gold_rush', 'valley_of_shadows']
     const missing = new Set<string>()
     for (let seed = 1; seed <= 12; seed++) {
@@ -373,16 +376,16 @@ describe('雙語', () => {
         const d = getDecisions(s)[0]
         const v = viewFor(s, d.player)
         if (d.type === 'ask') {
-          for (const x of [d.ask.title, d.ask.prompt, ...d.ask.options.map((o) => o.label)]) if (x && !x.includes(SEP)) missing.add(x)
+          for (const x of [d.ask.title, d.ask.prompt, ...d.ask.options.map((o) => o.label)]) if (x && x.split(SEP).length !== 3) missing.add(x)
         }
-        for (const a of v.abilities) if (!a.label.includes(SEP)) missing.add(a.label)
+        for (const a of v.abilities) if (a.label.split(SEP).length !== 3) missing.add(a.label)
         s = applyAction(s, d.player, decide(v))
         for (const l of s.log) if (!seen.has(l.seq)) {
           seen.add(l.seq)
-          if (!l.text.includes(SEP)) missing.add(l.text)
+          if (l.text.split(SEP).length !== 3) missing.add(l.text)
         }
       }
-      if (s.result) expect(s.result.reason.includes(SEP)).toBe(true)
+      if (s.result) expect(s.result.reason.split(SEP).length).toBe(3)
     }
     expect([...missing].slice(0, 10)).toEqual([])
   }, 60_000)

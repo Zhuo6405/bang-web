@@ -3439,7 +3439,8 @@ html.doc-open body {
 }
 
 /* 英文牌名比較長：字小一點、可以斷行 */
-html[lang='en-GB'] .card .card-name {
+html[lang='en-GB'] .card .card-name,
+html[lang='vi'] .card .card-name {
   font-size: 15px;
   letter-spacing: 0;
   line-height: 1.12;
@@ -3447,16 +3448,35 @@ html[lang='en-GB'] .card .card-name {
   hyphens: auto;
 }
 
-html[lang='en-GB'] .card.is-small .card-name {
+html[lang='en-GB'] .card.is-small .card-name,
+html[lang='vi'] .card.is-small .card-name {
   font-size: 11px;
 }
 
-html[lang='en-GB'] .card-type {
+html[lang='en-GB'] .card-type,
+html[lang='vi'] .card-type {
   font-size: 11px;
 }
 
 @media (max-width: 900px) {
-  html[lang='en-GB'] .card .card-name {
+  html[lang='en-GB'] .card .card-name,
+html[lang='vi'] .card .card-name {
     font-size: 12.5px;
   }
+}
+
+/* 語言選單 */
+select.lang-btn {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--desk-line);
+  border-radius: 6px;
+  padding: 0.45em 0.6em;
+  font: inherit;
+  cursor: pointer;
+}
+
+select.lang-btn option {
+  background: var(--desk-2);
+  color: var(--text);
 }

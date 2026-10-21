@@ -78,7 +78,7 @@ export function cardTexture(card: Card, lang: Lang = 'zh') {
     g.fillStyle = '#2a1a10'
     g.textAlign = 'center'
     g.textBaseline = 'middle'
-    const size = fit(g, name, 214, lang === 'en' ? 60 : 84, 34)
+    const size = fit(g, name, 214, lang !== 'zh' ? 60 : 84, 34)
     if (size <= 34 && name.includes(' ')) {
       g.font = `900 40px ${SERIF}`
       const lines = wrap(g, name, 214)
@@ -87,7 +87,17 @@ export function cardTexture(card: Card, lang: Lang = 'zh') {
     // 底部：類型
     g.fillStyle = BORDER[def.colour]
     const kind =
-      lang === 'en'
+      lang === 'vi'
+        ? def.colour === 'blue'
+          ? def.range
+            ? `Vũ khí · tầm ${def.range}`
+            : 'Trang bị'
+          : def.colour === 'green'
+            ? 'Xanh lá (từ lượt sau)'
+            : def.cost
+              ? 'Bỏ thêm 1 lá'
+              : 'Đánh ngay'
+        : lang === 'en'
         ? def.colour === 'blue'
           ? def.range
             ? `Weapon · range ${def.range}`
@@ -156,12 +166,12 @@ export function eventTexture(name: string, text: string, lang: Lang = 'zh') {
     g.textAlign = 'center'
     g.textBaseline = 'middle'
     g.font = `900 34px ${SERIF}`
-    g.fillText(lang === 'en' ? 'EVENT' : '事 件', 180, 62)
+    g.fillText(lang === 'zh' ? '事 件' : lang === 'vi' ? 'SỰ KIỆN' : 'EVENT', 180, 62)
     g.fillStyle = '#7a1e12'
-    fit(g, name, 300, lang === 'en' ? 64 : 92, 30)
+    fit(g, name, 300, lang !== 'zh' ? 64 : 92, 30)
     g.fillText(name, 180, 160)
     g.fillStyle = '#2a1a10'
-    g.font = `600 ${lang === 'en' ? 24 : 26}px ${SERIF}`
+    g.font = `600 ${lang !== 'zh' ? 24 : 26}px ${SERIF}`
     // 自動換行
     wrap(g, text, 290)
       .slice(0, 8)

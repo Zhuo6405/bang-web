@@ -5,7 +5,7 @@
 - **Solo**: in the lobby choose the number of players (4–7, or 8 with Dodge City), tick the expansions you want, choose the **computer difficulty** (Easy, Normal or Hard) and press "Start game". Computer players fill the other seats. Seats are shuffled every game.
 - **With friends**: press "Create room" and send the invite link. Friends open the link, enter a name and join, from any network. Computers fill empty seats. If someone disconnects, the game waits 15 seconds and then lets the computer play for them until they come back.
 - In an online room the host can also set the computer difficulty. You can chat by text or switch on voice.
-- **Language**: the "EN / 中文" button at the top of the lobby and the game switches between English and Chinese at any time. The choice is remembered on this device, and in online games everyone can use their own language.
+- **Language**: the language menu at the top of the lobby and the game switches between 中文 (Chinese), English and Tiếng Việt (Vietnamese) at any time. The choice is remembered on this device, and in online games everyone can use their own language.
 
 ## Roles and goals
 

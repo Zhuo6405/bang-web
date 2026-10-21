@@ -2,7 +2,7 @@
 
 ## Goal
 
-Play BANG! with friends in the browser: online multiplayer or solo against computer players, with chat and voice, a Traditional Chinese or English (UK spelling) interface, and a 3D saloon table.
+Play BANG! with friends in the browser: online multiplayer or solo against computer players, with chat and voice, a Traditional Chinese, English (UK spelling) or Vietnamese interface, and a 3D saloon table.
 
 ## Scope
 
@@ -22,7 +22,7 @@ Expansions are ticked when setting up a game or room.
 - **Server**: Cloudflare Workers + Durable Objects. One object per room holds the authoritative game state and pushes each player's view over WebSocket; the state is saved so a server restart can resume the game.
 - **Voice**: WebRTC, with signalling relayed through the room server.
 - **AI**: sees only its own view (no cheating). The engine records every public targeted interaction in `src/engine/reputation.ts` (weights listed in the guide's "How the computer guesses roles"). `src/ai/mind.ts` lets each computer start from the role counts and use the interactions as evidence to estimate everyone's role probabilities (including who shot whom, who shot me, role counting, and recalculation when the dead are revealed). It turns those into a certainty that someone is an enemy and only shoots when that passes a threshold and is clearly above the odds for a player who has shown nothing, adding grudges, finishing-off and random noise. Three levels: Easy (no chained reasoning, very random, slips), Normal and Hard (fullest reasoning, least random, keen to finish off).
-- **Two languages**: logs, prompts and error messages produced by the engine carry both Chinese and English (`bi()` in `src/engine/i18n.ts`), and each player sees their chosen language. Card, character and event names follow the official English edition.
+- **Three languages**: logs, prompts and error messages produced by the engine carry Chinese, English and Vietnamese (`bi()` in `src/engine/i18n.ts`), and each player sees their chosen language. Card, character and event names follow the official English edition; Vietnamese keeps those names and translates the descriptions.
 
 ## Rules implementation
 

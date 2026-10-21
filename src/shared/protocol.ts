@@ -50,7 +50,7 @@ export interface GamePacket {
 export type ToServer =
   | { t: 'hello'; clientId: string; name: string }
   | { t: 'settings'; patch: Partial<RoomSettings> }
-  | { t: 'start'; lang?: 'zh' | 'en' }
+  | { t: 'start'; lang?: 'zh' | 'en' | 'vi' }
   | { t: 'backToRoom' }
   | { t: 'action'; action: Action }
   | { t: 'chat'; text: string }

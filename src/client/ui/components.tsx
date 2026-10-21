@@ -33,7 +33,7 @@ export function CardFace({
         {SUIT_SYMBOL[card.suit]}
       </span>
       <span className="card-name">{name}</span>
-      {!small && <span className="card-type">{def.colour === 'blue' ? (def.range ? t(`射程 ${def.range}`, `Range ${def.range}`) : t('裝備', 'Equipment')) : def.colour === 'green' ? t('綠牌', 'Green') : def.cost ? t('另棄 1 張', '+1 discard') : t('立即使用', 'Play now')}</span>}
+      {!small && <span className="card-type">{def.colour === 'blue' ? (def.range ? t(`射程 ${def.range}`, `Range ${def.range}`, `Tầm ${def.range}`) : t('裝備', 'Equipment', 'Trang bị')) : def.colour === 'green' ? t('綠牌', 'Green', 'Xanh lá') : def.cost ? t('另棄 1 張', '+1 discard', 'Bỏ thêm 1 lá') : t('立即使用', 'Play now', 'Đánh ngay')}</span>}
     </>
   )
   if (!onClick)

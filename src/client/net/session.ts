@@ -96,7 +96,7 @@ export class RoomSession {
     if (this.left || this.status === 'closed') return
     this.status = 'reconnecting'
     this.lostAt ??= Date.now()
-    if (Date.now() - this.lostAt > GIVE_UP_MS) return this.fail(t('和伺服器的連線中斷了，請檢查網路後重新加入。', 'Lost the connection to the server. Check your network and join again.'))
+    if (Date.now() - this.lostAt > GIVE_UP_MS) return this.fail(t('和伺服器的連線中斷了，請檢查網路後重新加入。', 'Lost the connection to the server. Check your network and join again.', 'Mất kết nối với máy chủ. Hãy kiểm tra mạng rồi vào lại.'))
     const delay = Math.min(5000, 800 * 2 ** this.attempts++)
     clearTimeout(this.retry)
     this.retry = setTimeout(() => this.connect(), delay)

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { AI_NAMES, EXPANSIONS, maxPlayersFor, MIN_PLAYERS } from '../../engine/data'
-import { AI_NAMES_EN, expName, roleName } from '../../engine/i18n'
-import { getLang, LangToggle, t, tx } from '../lang'
+import { AI_NAMES_EN, AI_NAMES_VI, expName, roleName } from '../../engine/i18n'
+import { getLang, LangToggle, locale, t, tx } from '../lang'
 import type { GameConfig } from '../../engine/types'
 import { DocsButtons } from './Docs'
 import { normaliseCode } from '../../shared/protocol'
@@ -20,23 +20,23 @@ function storedLevel(): AiLevel {
 
 /** 電腦難度 */
 export function LevelPicker({ value, onChange, readOnly }: { value: AiLevel; onChange?: (v: AiLevel) => void; readOnly?: boolean }) {
-  const opts: { id: AiLevel; zh: string; en: string; hintZh: string; hintEn: string }[] = [
-    { id: 'easy', zh: '簡單', en: 'Easy', hintZh: '常猜錯、偶爾忘了出牌', hintEn: 'Often guesses wrong, sometimes forgets to play' },
-    { id: 'normal', zh: '普通', en: 'Normal', hintZh: '會推理身分、會記仇', hintEn: 'Reasons about roles and holds grudges' },
-    { id: 'hard', zh: '困難', en: 'Hard', hintZh: '推理更準、懂得補刀', hintEn: 'Sharper reasoning, finishes off the wounded' },
+  const opts: { id: AiLevel; zh: string; en: string; vi: string; hintZh: string; hintEn: string; hintVi: string }[] = [
+    { id: 'easy', zh: '簡單', en: 'Easy', vi: 'Dễ', hintZh: '常猜錯、偶爾忘了出牌', hintEn: 'Often guesses wrong, sometimes forgets to play', hintVi: 'Hay đoán sai, đôi khi quên đánh bài' },
+    { id: 'normal', zh: '普通', en: 'Normal', vi: 'Thường', hintZh: '會推理身分、會記仇', hintEn: 'Reasons about roles and holds grudges', hintVi: 'Biết suy luận vai trò và thù dai' },
+    { id: 'hard', zh: '困難', en: 'Hard', vi: 'Khó', hintZh: '推理更準、懂得補刀', hintEn: 'Sharper reasoning, finishes off the wounded', hintVi: 'Suy luận sắc hơn, biết kết liễu kẻ yếu' },
   ]
   const cur = opts.find((o) => o.id === value) ?? opts[1]
   return (
     <div className="field">
-      <span>{t('電腦難度', 'Computer difficulty')}</span>
-      <div className="segmented" role="radiogroup" aria-label={t('電腦難度', 'Computer difficulty')}>
+      <span>{t('電腦難度', 'Computer difficulty', 'Độ khó của máy')}</span>
+      <div className="segmented" role="radiogroup" aria-label={t('電腦難度', 'Computer difficulty', 'Độ khó của máy')}>
         {opts.map((o) => (
           <button key={o.id} type="button" role="radio" aria-checked={o.id === value} className={o.id === value ? 'on' : ''} disabled={readOnly} onClick={() => onChange?.(o.id)}>
-            {t(o.zh, o.en)}
+            {t(o.zh, o.en, o.vi)}
           </button>
         ))}
       </div>
-      <small className="muted">{t(cur.hintZh, cur.hintEn)}</small>
+      <small className="muted">{t(cur.hintZh, cur.hintEn, cur.hintVi)}</small>
     </div>
   )
 }
@@ -84,8 +84,8 @@ export function Lobby({
   }
 
   const startLocal = () => {
-    const me = myName() || t('我', 'Me')
-    const names = [...(getLang() === 'en' ? AI_NAMES_EN : AI_NAMES)].filter((x) => x !== me).sort(() => Math.random() - 0.5)
+    const me = myName() || t('我', 'Me', 'Tôi')
+    const names = [...(getLang() === 'en' ? AI_NAMES_EN : getLang() === 'vi' ? AI_NAMES_VI : AI_NAMES)].filter((x) => x !== me).sort(() => Math.random() - 0.5)
     // 座位隨機：你不一定坐第一個
     const seat = Math.floor(Math.random() * count)
     const seated = names.slice(0, count - 1)
@@ -103,29 +103,29 @@ export function Lobby({
     <main className="lobby">
       <header className="lobby-title">
         <h1>BANG!</h1>
-        <p>{t('西部槍戰身份卡牌遊戲', 'The Wild West card game of hidden roles')}</p>
+        <p>{t('西部槍戰身份卡牌遊戲', 'The Wild West card game of hidden roles', 'Trò chơi thẻ bài miền Viễn Tây với vai trò bí mật')}</p>
         <DocsButtons />
         <LangToggle />
       </header>
 
       <label className={`field name-field ${nameErr ? 'has-error' : ''}`}>
-        <span>{t('你的名字', 'Your name')}</span>
+        <span>{t('你的名字', 'Your name', 'Tên của bạn')}</span>
         <input
           value={name}
           maxLength={12}
-          placeholder={t('輸入暱稱', 'Enter a nickname')}
+          placeholder={t('輸入暱稱', 'Enter a nickname', 'Nhập biệt danh')}
           autoFocus={!!urlRoom}
           onChange={(e) => {
             setName(e.target.value)
             setNameErr(false)
           }}
         />
-        {nameErr && <small className="err">{t('連線遊戲需要先輸入名字。', 'Enter a name to play online.')}</small>}
+        {nameErr && <small className="err">{t('連線遊戲需要先輸入名字。', 'Enter a name to play online.', 'Hãy nhập tên để chơi trực tuyến.')}</small>}
       </label>
 
       {urlRoom && (
-        <section className="lobby-panel is-invite" aria-label={t('受邀加入房間', 'Room invitation')}>
-          <h2>{t(`你被邀請加入房間 ${urlRoom}`, `You have been invited to room ${urlRoom}`)}</h2>
+        <section className="lobby-panel is-invite" aria-label={t('受邀加入房間', 'Room invitation', 'Lời mời vào phòng')}>
+          <h2>{t(`你被邀請加入房間 ${urlRoom}`, `You have been invited to room ${urlRoom}`, `Bạn được mời vào phòng ${urlRoom}`)}</h2>
           <button
             type="button"
             className="primary"
@@ -134,13 +134,13 @@ export function Lobby({
               if (n) onOnline(urlRoom, n, false)
             }}
           >
-            {t('加入房間', 'Join room')}
+            {t('加入房間', 'Join room', 'Vào phòng')}
           </button>
         </section>
       )}
 
-      <section className="lobby-panel" aria-label={t('和朋友連線', 'Play with friends')}>
-        <h2>{t('和朋友連線', 'Play with friends')}</h2>
+      <section className="lobby-panel" aria-label={t('和朋友連線', 'Play with friends', 'Chơi với bạn bè')}>
+        <h2>{t('和朋友連線', 'Play with friends', 'Chơi với bạn bè')}</h2>
         <div className="online-row">
           <div>
             <button
@@ -155,13 +155,13 @@ export function Lobby({
                 fetch('/api/new')
                   .then((r) => r.json() as Promise<{ code: string }>)
                   .then(({ code }) => onOnline(code, n, true))
-                  .catch(() => setNetErr(t('連不到遊戲伺服器，請檢查網路後再試。', 'Cannot reach the game server. Check your connection and try again.')))
+                  .catch(() => setNetErr(t('連不到遊戲伺服器，請檢查網路後再試。', 'Cannot reach the game server. Check your connection and try again.', 'Không kết nối được máy chủ trò chơi. Hãy kiểm tra mạng và thử lại.')))
                   .finally(() => setBusy(false))
               }}
             >
-              {t('建立房間', 'Create room')}
+              {t('建立房間', 'Create room', 'Tạo phòng')}
             </button>
-            <p className="muted">{t('遊戲在雲端伺服器進行，任何網路都能連。', 'Games run on a cloud server, so any network works.')}</p>
+            <p className="muted">{t('遊戲在雲端伺服器進行，任何網路都能連。', 'Games run on a cloud server, so any network works.', 'Ván chơi chạy trên máy chủ đám mây, mạng nào cũng chơi được.')}</p>
           </div>
           <form
             className="join"
@@ -172,20 +172,20 @@ export function Lobby({
               if (n && c) onOnline(c, n, false)
             }}
           >
-            <input value={code} onChange={(e) => setCode(normaliseCode(e.target.value))} placeholder={t('邀請碼', 'Invite code')} aria-label={t('邀請碼', 'Invite code')} maxLength={8} />
+            <input value={code} onChange={(e) => setCode(normaliseCode(e.target.value))} placeholder={t('邀請碼', 'Invite code', 'Mã mời')} aria-label={t('邀請碼', 'Invite code', 'Mã mời')} maxLength={8} />
             <button type="submit" disabled={!normaliseCode(code)}>
-              {t('加入', 'Join')}
+              {t('加入', 'Join', 'Vào')}
             </button>
           </form>
         </div>
         {netErr && <p className="err">{netErr}</p>}
       </section>
 
-      <section className="lobby-panel" aria-label={t('單機對戰 AI', 'Play against the computer')}>
-        <h2>{t('單機對戰 AI', 'Play against the computer')}</h2>
+      <section className="lobby-panel" aria-label={t('單機對戰 AI', 'Play against the computer', 'Chơi với máy')}>
+        <h2>{t('單機對戰 AI', 'Play against the computer', 'Chơi với máy')}</h2>
         <div className="field">
-          <span>{t('遊戲人數（含你）', 'Players (including you)')}</span>
-          <div className="segmented" role="radiogroup" aria-label={t('遊戲人數', 'Number of players')}>
+          <span>{t('遊戲人數（含你）', 'Players (including you)', 'Số người chơi (gồm cả bạn)')}</span>
+          <div className="segmented" role="radiogroup" aria-label={t('遊戲人數', 'Number of players', 'Số người chơi')}>
             {Array.from({ length: maxPlayersFor(expansions) - MIN_PLAYERS + 1 }, (_, i) => MIN_PLAYERS + i).map((n) => (
               <button key={n} type="button" role="radio" aria-checked={n === count} className={n === count ? 'on' : ''} onClick={() => setCount(n)}>
                 {n}
@@ -215,20 +215,20 @@ export function Lobby({
         />
 
         <button type="button" className="primary" onClick={startLocal}>
-          {t('開始單機遊戲', 'Start game')}
+          {t('開始單機遊戲', 'Start game', 'Bắt đầu')}
         </button>
       </section>
 
       {history.length > 0 && (
-        <section className="lobby-panel" aria-label={t('最近對局', 'Recent games')}>
-          <h2>{t('最近對局', 'Recent games')}</h2>
+        <section className="lobby-panel" aria-label={t('最近對局', 'Recent games', 'Ván gần đây')}>
+          <h2>{t('最近對局', 'Recent games', 'Ván gần đây')}</h2>
           <ul className="history">
             {history.slice(0, 8).map((h) => (
               <li key={h.id}>
-                <span className={`h-result ${h.won ? 'is-win' : ''}`}>{h.won ? t('勝', 'Won') : t('敗', 'Lost')}</span>
+                <span className={`h-result ${h.won ? 'is-win' : ''}`}>{h.won ? t('勝', 'Won', 'Thắng') : t('敗', 'Lost', 'Thua')}</span>
                 <span className="h-meta">
-                  {new Date(h.at).toLocaleDateString(getLang() === 'en' ? 'en-GB' : 'zh-TW', { month: getLang() === 'en' ? 'short' : 'numeric', day: 'numeric' })}．{h.mode === 'online' ? t('連線', 'Online') : t('單機', 'Solo')}．
-                  {t(`${h.players.length} 人`, `${h.players.length} players`)}．{t('你是', 'You were ')}
+                  {new Date(h.at).toLocaleDateString(locale(), { month: getLang() === 'zh' ? 'numeric' : 'short', day: 'numeric' })}．{h.mode === 'online' ? t('連線', 'Online', 'Trực tuyến') : t('單機', 'Solo', 'Chơi đơn')}．
+                  {t(`${h.players.length} 人`, `${h.players.length} players`, `${h.players.length} người`)}．{t('你是', 'You were ', 'Bạn là ')}
                   {h.myRole ? roleName(h.myRole, getLang()) : '—'}
                 </span>
                 <span className="h-reason">{tx(h.reason)}</span>
@@ -243,13 +243,13 @@ export function Lobby({
               setHistory([])
             }}
           >
-            {t('清除紀錄', 'Clear history')}
+            {t('清除紀錄', 'Clear history', 'Xóa lịch sử')}
           </button>
         </section>
       )}
 
       <footer className="lobby-foot">
-        {t('基本版與道奇城、正午、一把卡牌、淘金熱、幽谷、西部秀已實裝；全副武裝製作中。', 'Includes the base game, Dodge City, High Noon, A Fistful of Cards, Gold Rush, The Valley of Shadows and Wild West Show. Armed & Dangerous is in progress.')}
+        {t('基本版與道奇城、正午、一把卡牌、淘金熱、幽谷、西部秀已實裝；全副武裝製作中。', 'Includes the base game, Dodge City, High Noon, A Fistful of Cards, Gold Rush, The Valley of Shadows and Wild West Show. Armed & Dangerous is in progress.', 'Gồm bản cơ bản, Dodge City, High Noon, A Fistful of Cards, Gold Rush, The Valley of Shadows và Wild West Show. Armed & Dangerous đang được làm.')}
       </footer>
     </main>
   )
@@ -258,7 +258,7 @@ export function Lobby({
 export function ExpansionPicker({ value, onChange, readOnly }: { value: string[]; onChange?: (v: string[]) => void; readOnly?: boolean }) {
   return (
     <div className="field">
-      <span>{t('擴充', 'Expansions')}</span>
+      <span>{t('擴充', 'Expansions', 'Bản mở rộng')}</span>
       <div className="expansions">
         {EXPANSIONS.map((e) => {
           const on = value.includes(e.id)
@@ -272,7 +272,7 @@ export function ExpansionPicker({ value, onChange, readOnly }: { value: string[]
               />
               <span>
                 {expName(e.id, getLang())}
-                {!e.ready && <small>{t('即將推出', 'Coming soon')}</small>}
+                {!e.ready && <small>{t('即將推出', 'Coming soon', 'Sắp ra mắt')}</small>}
               </span>
             </label>
           )
